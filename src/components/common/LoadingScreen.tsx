@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 
-import { COLORS, SIZES } from '../../assets/theme';
+import { COLORS, SIZES } from '../../core/theme';
 
 interface LoadingScreenProps {
   isTransparent?: boolean;
