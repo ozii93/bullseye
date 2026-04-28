@@ -13,7 +13,7 @@ const CustomHeader = () => (
   <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: "space-between", width: '100%' }}>
     <View>
       <Image
-        source={require('../../../assets/img/main-logo.png')}
+        source={require('../../../assets/img/logo-full.png')}
         style={{
           width: 130,
           resizeMode: 'contain',

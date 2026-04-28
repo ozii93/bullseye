@@ -7,7 +7,7 @@ import MaterialDesignIcons from '@react-native-vector-icons/material-design-icon
 const DashboardScreen = ({ navigation, isFocused }: any) => {
   const theme = useTheme();
   const [isConnected, setIsConnected] = useState(false);
-  const [deviceName, setDeviceName] = useState('NightHawk Thermal Device');
+  const [deviceName, setDeviceName] = useState('BullsEye Thermal Device');
 
   useEffect(() => {
     if (!isFocused) return;
@@ -28,7 +28,7 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
         if (response.ok) {
           const data = await response.json();
           // Biasanya field-nya adalah 'deviceName' atau 'model'
-          const name = data.deviceName || data.model || data.hostname || 'NightHawk Device';
+          const name = data.deviceName || data.model || data.hostname || 'BullsEye Device';
           setDeviceName(name);
           setIsConnected(true);
         } else {

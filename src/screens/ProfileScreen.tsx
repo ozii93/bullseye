@@ -19,7 +19,7 @@ const ProfileScreen = () => {
             style={styles.avatar}
           />
           <Text style={styles.name}>Commander Hawk</Text>
-          <Text style={styles.email}>hawk@nighthawk.security</Text>
+          <Text style={styles.email}>hawk@BullsEye.security</Text>
           <Button 
             mode="outlined" 
             onPress={() => {}} 
@@ -82,7 +82,7 @@ const ProfileScreen = () => {
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versionText}>NightHawk v1.0.4-beta</Text>
+        <Text style={styles.versionText}>BullsEye v1.0.4-beta</Text>
 
       </ScrollView>
     </SafeAreaView>
