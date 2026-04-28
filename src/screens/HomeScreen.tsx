@@ -7,6 +7,7 @@ import {
   Text,
   StatusBar,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -130,10 +131,11 @@ async function sendPallet(id: number) {
    SCREEN
 ========================================================= */
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }: any) => {
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
   const [activePalette, setActivePalette] = useState(0);
   const [playerKey, setPlayerKey] = useState(1);
+  const [isRecording, setIsRecording] = useState(false);
 
   const handleChangePalette = async (palette: any) => {
     setActivePalette(palette.uiId);
@@ -149,11 +151,10 @@ const HomeScreen = () => {
         translucent
       />
 
-      {/* 1. RTSP VIDEO LAYER (FULL SCREEN BACKGROUND) */}
       <VLCPlayer
         key={playerKey}
         style={styles.videoStream}
-        videoAspectRatio="16:9" // Bisa diubah ke "4:3" kalau gambarnya kelihatan gepeng
+        videoAspectRatio="16:9"
         source={{
           uri: 'rtsp://192.168.42.1:8554/video',
           initOptions: [
@@ -164,62 +165,58 @@ const HomeScreen = () => {
             '--clock-synchro=0',
             '--no-drop-late-frames',
             '--skip-frames',
-            // '--no-video-title-show',
           ]
         }}
-        // source={{
-        //   uri: 'rtsp://192.168.42.1:8554/video',
-        //   initOptions: [
-        //     '--rtsp-frame-buffer-size=100000',
-        //     '--network-caching=50',
-        //     '--live-caching=50',
-        //     '--drop-late-frames',
-        //     '--skip-frames'
-        //   ],
-        // }}
         autoplay
         onPlaying={() => console.log('🔥 RTSP STREAM CONNECTED & PLAYING!')}
-        onError={(error) => {
-          console.log('❌ RTSP STREAM ERROR:', error)
+        onError={() => {
           setTimeout(() => {
             setPlayerKey(v => v + 1);
           }, 1500);
         }}
-        onBuffering={(event) => {
-          console.log('⏳ RTSP STREAM BUFFERING...', event)
-        }}
       />
 
-      <SafeAreaView
-        style={styles.overlayContainer}
-        edges={['top', 'bottom']}
-      >
+      <SafeAreaView style={styles.overlayContainer} edges={['top', 'bottom']}>
         {/* HEADER */}
         <View style={styles.floatingHeader}>
-          <IconButton
-            icon="home-outline"
-            iconColor="#FFF"
-            size={24}
-            onPress={() => { }}
-          />
-
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>● LIVE</Text>
+          <View style={styles.headerLeft}>
+            <IconButton
+              icon="chevron-left"
+              iconColor="#FFF"
+              size={28}
+              onPress={() => {
+                // Emit event untuk pindah ke tab dashboard
+                DeviceEventEmitter.emit('changeTab', 'dashboard');
+              }}
+            />
           </View>
 
-          <IconButton
-            icon="cog-outline"
-            iconColor="#FFF"
-            size={24}
-            onPress={() => { }}
-          />
+          <View style={styles.statusBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.statusText}>LIVE</Text>
+          </View>
+
+          <View style={styles.headerRight}>
+            <IconButton
+              icon="cog"
+              iconColor="#FFF"
+              size={24}
+              onPress={() => { }}
+            />
+          </View>
         </View>
 
-        {/* BOTTOM */}
+        {/* MIDDLE INFO */}
+        <View style={styles.midInfo}>
+          <Text style={styles.isoText}>ISO 400</Text>
+          <Text style={styles.isoText}>1/60</Text>
+          <Text style={styles.isoText}>F1.8</Text>
+        </View>
+
+        {/* BOTTOM SECTION */}
         <View style={styles.bottomSection}>
-          {/* PALETTE SELECTOR */}
           {isPaletteVisible && (
-            <View style={styles.paletteContainer}>
+            <View style={styles.paletteWrapper}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -227,11 +224,10 @@ const HomeScreen = () => {
               >
                 {PALETTES.map((item) => {
                   const isActive = activePalette === item.uiId;
-
                   return (
                     <TouchableOpacity
                       key={item.uiId}
-                      activeOpacity={0.8}
+                      activeOpacity={0.7}
                       style={[
                         styles.palettePill,
                         isActive && styles.activePalettePill,
@@ -244,7 +240,6 @@ const HomeScreen = () => {
                           { backgroundColor: item.color },
                         ]}
                       />
-
                       <Text
                         style={[
                           styles.paletteText,
@@ -260,43 +255,51 @@ const HomeScreen = () => {
             </View>
           )}
 
-          {/* BOTTOM DOCK */}
           <View style={styles.bottomDock}>
-            <TouchableOpacity style={styles.galleryButton}>
-              <View style={styles.galleryPlaceholder} />
-            </TouchableOpacity>
+            <View style={styles.dockItem}>
+              <TouchableOpacity style={styles.galleryButton}>
+                <View style={styles.galleryThumb}>
+                  <View style={styles.galleryInner} />
+                </View>
+              </TouchableOpacity>
+            </View>
 
-            <IconButton
-              icon="video-outline"
-              iconColor="#A0A0A5"
-              size={28}
-              onPress={() => { }}
-            />
+            <View style={styles.dockItem}>
+              <IconButton
+                icon={isRecording ? "stop-circle" : "video-outline"}
+                iconColor={isRecording ? "#FF3B30" : "#FFF"}
+                size={30}
+                onPress={() => setIsRecording(!isRecording)}
+              />
+            </View>
 
-            <TouchableOpacity
-              style={styles.shutterRing}
-              onPress={() => console.log('Capture')}
-            >
-              <View style={styles.shutterCenter} />
-            </TouchableOpacity>
+            <View style={styles.dockItem}>
+              <TouchableOpacity
+                style={styles.shutterOuter}
+                activeOpacity={0.7}
+                onPress={() => console.log('Capture')}
+              >
+                <View style={styles.shutterInner} />
+              </TouchableOpacity>
+            </View>
 
-            <IconButton
-              icon="tune-vertical"
-              iconColor="#A0A0A5"
-              size={28}
-              onPress={() => { }}
-            />
+            <View style={styles.dockItem}>
+              <IconButton
+                icon="tune-variant"
+                iconColor="#FFF"
+                size={30}
+                onPress={() => { }}
+              />
+            </View>
 
-            <IconButton
-              icon="palette-swatch-outline"
-              iconColor={
-                isPaletteVisible ? '#00E5FF' : '#A0A0A5'
-              }
-              size={28}
-              onPress={() =>
-                setIsPaletteVisible(!isPaletteVisible)
-              }
-            />
+            <View style={styles.dockItem}>
+              <IconButton
+                icon="palette"
+                iconColor={isPaletteVisible ? '#00E5FF' : '#FFF'}
+                size={30}
+                onPress={() => setIsPaletteVisible(!isPaletteVisible)}
+              />
+            </View>
           </View>
         </View>
       </SafeAreaView>
@@ -306,150 +309,11 @@ const HomeScreen = () => {
 
 export default HomeScreen;
 
-/* =========================================================
-   STYLE
-========================================================= */
-
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     backgroundColor: '#000',
   },
-
-  overlayContainer: {
-    flex: 1,
-    zIndex: 1,
-    elevation: 1,
-    justifyContent: 'space-between',
-    paddingBottom: 20,
-  },
-
-  /* HEADER */
-  floatingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: 15,
-    marginTop: 10,
-    backgroundColor: 'rgba(28,28,30,0.6)',
-    borderRadius: 30,
-    paddingHorizontal: 5,
-  },
-
-  statusBadge: {
-    backgroundColor: 'rgba(255,59,48,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,59,48,0.5)',
-  },
-
-  statusText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-
-  /* BOTTOM */
-  bottomSection: {
-    alignItems: 'center',
-  },
-
-  paletteContainer: {
-    width: '100%',
-    marginBottom: 18,
-  },
-
-  paletteScroll: {
-    paddingHorizontal: 14,
-  },
-
-  /* BIGGER CLICK AREA */
-  palettePill: {
-    minWidth: 130,
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    backgroundColor: 'rgba(28,28,30,0.88)',
-    paddingHorizontal: 18,
-    marginRight: 12,
-    borderRadius: 18,
-
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-
-  activePalettePill: {
-    borderColor: '#00E5FF',
-    backgroundColor: 'rgba(0,229,255,0.12)',
-  },
-
-  colorDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: 10,
-  },
-
-  paletteText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  activePaletteText: {
-    color: '#00E5FF',
-    fontWeight: '700',
-  },
-
-  /* BOTTOM DOCK */
-  bottomDock: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-
-    width: '92%',
-    backgroundColor: 'rgba(18,18,18,0.75)',
-
-    borderRadius: 40,
-    paddingVertical: 10,
-    paddingHorizontal: 5,
-  },
-
-  galleryButton: {
-    padding: 8,
-  },
-
-  galleryPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#3A3A3C',
-    borderWidth: 1.5,
-    borderColor: '#FFF',
-  },
-
-  shutterRing: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    borderWidth: 3,
-    borderColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  shutterCenter: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#FFF',
-  },
-
   videoStream: {
     position: 'absolute',
     top: 0,
@@ -457,4 +321,141 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
+  overlayContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  floatingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    marginTop: 10,
+  },
+  headerLeft: { width: 50 },
+  headerRight: { width: 50, alignItems: 'flex-end' },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+    marginRight: 8,
+  },
+  statusText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 1.5,
+  },
+  midInfo: {
+    position: 'absolute',
+    top: '20%',
+    right: 20,
+    alignItems: 'flex-end',
+  },
+  isoText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  bottomSection: {
+    paddingBottom: 30,
+    alignItems: 'center',
+  },
+  paletteWrapper: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  paletteScroll: {
+    paddingHorizontal: 20,
+  },
+  palettePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(28,28,30,0.8)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginRight: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  activePalettePill: {
+    borderColor: '#00E5FF',
+    backgroundColor: 'rgba(0,229,255,0.1)',
+  },
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  paletteText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  activePaletteText: {
+    color: '#00E5FF',
+    fontWeight: 'bold',
+  },
+  bottomDock: {
+    flexDirection: 'row',
+    width: '94%',
+    height: 80,
+    backgroundColor: 'rgba(20,20,20,0.9)',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  dockItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryButton: { width: 44, height: 44 },
+  galleryThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    padding: 2,
+  },
+  galleryInner: {
+    flex: 1,
+    borderRadius: 6,
+    backgroundColor: '#333',
+  },
+  shutterOuter: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 4,
+    borderColor: '#FFF',
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shutterInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+    backgroundColor: '#FFF',
+  },
 });
+

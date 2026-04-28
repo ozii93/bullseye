@@ -10,7 +10,7 @@ import { memo, useEffect, useRef } from 'react'
 // import PairDeviceScreen from '../screens/PairDeviceScreen'
 // import ScanDevicesScreen from '../screens/ScanDeviceScreen'
 import React from 'react'
-import BottomTabBar from '../components/layout/BottomTabBar'
+import StackBottomTabBar from '../components/layout/StackBottomTabBar'
 import { Alert, BackHandler } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import HomeScreen from '../screens/HomeScreen'
@@ -109,7 +109,7 @@ const AppNavigator = memo(
         >
           <MainStack.Screen
             name={'Main'}
-            component={HomeScreen}
+            component={StackBottomTabBar}
             options={{ headerShown: false }}
           />
           {/* <MainStack.Screen
