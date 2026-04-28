@@ -131,11 +131,26 @@ async function sendPallet(id: number) {
    SCREEN
 ========================================================= */
 
-const HomeScreen = ({ navigation }: any) => {
+const HomeScreen = ({ navigation, isFocused }: any) => {
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
   const [activePalette, setActivePalette] = useState(0);
   const [playerKey, setPlayerKey] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
+  
+  // State lokal untuk mengontrol render player agar tidak langsung mati saat pindah menu
+  const [renderPlayer, setRenderPlayer] = useState(isFocused);
+
+  useEffect(() => {
+    if (isFocused) {
+      setRenderPlayer(true);
+    } else {
+      // Jeda 500ms sebelum mematikan player agar transisi navigasi selesai dulu
+      const timer = setTimeout(() => {
+        setRenderPlayer(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isFocused]);
 
   const handleChangePalette = async (palette: any) => {
     setActivePalette(palette.uiId);
@@ -151,30 +166,39 @@ const HomeScreen = ({ navigation }: any) => {
         translucent
       />
 
-      <VLCPlayer
-        key={playerKey}
-        style={styles.videoStream}
-        videoAspectRatio="16:9"
-        source={{
-          uri: 'rtsp://192.168.42.1:8554/video',
-          initOptions: [
-            '--rtsp-tcp',
-            '--network-caching=50',
-            '--live-caching=50',
-            '--clock-jitter=0',
-            '--clock-synchro=0',
-            '--no-drop-late-frames',
-            '--skip-frames',
-          ]
-        }}
-        autoplay
-        onPlaying={() => console.log('🔥 RTSP STREAM CONNECTED & PLAYING!')}
-        onError={() => {
-          setTimeout(() => {
-            setPlayerKey(v => v + 1);
-          }, 1500);
-        }}
-      />
+      {renderPlayer && (
+        <VLCPlayer
+          key={playerKey}
+          style={styles.videoStream}
+          videoAspectRatio="16:9"
+          source={{
+            uri: 'rtsp://192.168.42.1:8554/video',
+
+            initOptions: [
+              '--network-caching=150',
+              '--rtsp-caching=150',
+              '--live-caching=150',
+              '--clock-jitter=0',
+              '--clock-synchro=0',
+              '--drop-late-frames',
+              '--skip-frames',
+              '--avcodec-hw=any',
+              '--no-stats',
+              '--no-osd',
+            ]
+          }}
+          autoplay
+          onPlaying={() => console.log('🔥 RTSP STREAM CONNECTED & PLAYING!')}
+          onError={() => {
+            setTimeout(() => {
+              setPlayerKey(v => v + 1);
+            }, 2000);
+          }}
+        />
+      )}
+
+
+
 
       <SafeAreaView style={styles.overlayContainer} edges={['top', 'bottom']}>
         {/* HEADER */}
@@ -185,10 +209,12 @@ const HomeScreen = ({ navigation }: any) => {
               iconColor="#FFF"
               size={28}
               onPress={() => {
-                // Emit event untuk pindah ke tab dashboard
+                // Berikan perintah pindah tab segera
                 DeviceEventEmitter.emit('changeTab', 'dashboard');
               }}
+              rippleColor="rgba(255, 255, 255, 0.2)"
             />
+
           </View>
 
           <View style={styles.statusBadge}>

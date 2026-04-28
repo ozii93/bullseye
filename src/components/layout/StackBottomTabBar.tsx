@@ -22,6 +22,13 @@ const menus: {
     { key: 'profile', title: 'Profile', icon: 'account' },
   ];
 
+// Pindahkan routes ke luar agar tidak di-recreate setiap render
+const routes = menus.map(menu => ({
+  key: menu.key,
+  title: menu.title,
+  icon: menu.icon,
+}));
+
 // Scene Map - Tambahkan GalleryScreen
 const renderScene = BottomNavigation.SceneMap({
   dashboard: DashboardScreen,
@@ -42,13 +49,6 @@ export default function StackBottomTabBar({ initRouteName }: any) {
 
   const [index, setIndex] = useState(getInitialIndex());
 
-  // Gunakan variabel konstan, jangan state, agar perubahan menu langsung terbaca
-  const routes = menus.map(menu => ({
-    key: menu.key,
-    title: menu.title,
-    icon: menu.icon,
-  }));
-
   React.useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('changeTab', (tabKey: string) => {
       const tabIndex = menus.findIndex(m => m.key === tabKey);
@@ -59,14 +59,33 @@ export default function StackBottomTabBar({ initRouteName }: any) {
     return () => subscription.remove();
   }, []);
 
+  // Custom renderScene untuk mengirim prop isFocused
+  const renderScene = ({ route }: any) => {
+    switch (route.key) {
+      case 'dashboard':
+        return <DashboardScreen isFocused={index === 0} />;
+      case 'gallery':
+        return <GalleryScreen isFocused={index === 1} />;
+      case 'home':
+        return <HomeScreen isFocused={index === 2} />;
+      case 'profile':
+        return <ProfileScreen isFocused={index === 3} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <BottomNavigation
         navigationState={{ index, routes }}
         onIndexChange={setIndex}
         renderScene={renderScene}
+        sceneAnimationEnabled={true}
+        sceneAnimationType="shifting"
         renderIcon={({ route, focused }: any) => {
-          if (route.key === 'home') {
+          const isHome = route.key === 'home';
+          if (isHome) {
             return (
               <View style={styles.centerButtonWrapper}>
                 <View style={[styles.centerButton, { backgroundColor: focused ? theme.colors.secondary : 'rgba(255, 255, 255, 0.05)' }]}>
@@ -100,15 +119,22 @@ export default function StackBottomTabBar({ initRouteName }: any) {
         barStyle={[
           styles.floatingBar,
           {
-            backgroundColor: theme.colors.background, // Disamakan dengan background dashboard
+            backgroundColor: theme.colors.background,
             marginBottom: insets.bottom + 10,
           },
-          index === 2 && { height: 0, opacity: 0, display: 'none' }
+          index === 2 && { 
+            height: 0, 
+            opacity: 0, 
+            position: 'absolute',
+            bottom: -100 // Pindahkan ke luar layar agar benar-benar tidak terlihat
+          }
         ]}
       />
     </View>
   );
-};
+}
+
+
 
 
 
