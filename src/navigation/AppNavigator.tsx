@@ -109,7 +109,7 @@ const AppNavigator = memo(
         >
           <MainStack.Screen
             name={'Main'}
-            component={BottomTabBar}
+            component={HomeScreen}
             options={{ headerShown: false }}
           />
           {/* <MainStack.Screen

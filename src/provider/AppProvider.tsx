@@ -3,6 +3,7 @@ import { StatusBar } from 'react-native'
 import { AppLoading } from '../components/layout/AppLoading'
 import AppNavigator from '../navigation/AppNavigator'
 import { useTheme } from 'react-native-paper'
+import BootSplash from 'react-native-bootsplash';
 
 interface RootState {
   user: null
@@ -10,19 +11,20 @@ interface RootState {
 const AppProvider = () => {
   const [isLoading, setLoading] = useState(true)
   const [tokenChecked, setTokenChecked] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState<any>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState<any>(true)
   const theme = useTheme()
 
   useEffect(() => {
     const init = async () => {
       // await getUser()
+      return true
     }
     // getUser()
 
-    // init().finally(async () => {
-    //   await BootSplash.hide({ fade: true });
-    //   console.log("BootSplash has been hidden successfully");
-    // });
+    init().finally(async () => {
+      await BootSplash.hide({ fade: true });
+      console.log("BootSplash has been hidden successfully");
+    });
   }, [])
 
   // const getUser = async () => {
@@ -39,10 +41,11 @@ const AppProvider = () => {
   //   } catch (error) { }
   // }
 
+  console.log('test')
   if (isLoggedIn != null) {
     return (
       <>
-        <AppNavigator isLoggedIn={true} />
+        <AppNavigator isLoggedIn={isLoggedIn} />
         {/* Loading */}
         <AppLoading></AppLoading>
       </>
