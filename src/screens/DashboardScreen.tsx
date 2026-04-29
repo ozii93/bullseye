@@ -23,6 +23,7 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
           signal: controller.signal
         });
         
+        console.log(response)
         clearTimeout(timeoutId);
 
         if (response.ok) {
@@ -42,6 +43,7 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
     };
 
     checkConnection();
+    console.log('Init Dashboard Screen')
     const interval = setInterval(checkConnection, 5000); // Check every 5 seconds
     return () => clearInterval(interval);
   }, [isFocused]);
@@ -108,7 +110,7 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
         <Text style={styles.sectionTitle}>Main Monitor</Text>
         <TouchableOpacity 
           activeOpacity={0.9}
-          onPress={() => DeviceEventEmitter.emit('changeTab', 'home')}
+          onPress={() => navigation.navigate('Stream')}
           style={styles.previewContainer}
         >
           <View style={styles.previewPlaceholder}>

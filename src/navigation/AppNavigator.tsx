@@ -14,23 +14,21 @@ import StackBottomTabBar from '../components/layout/StackBottomTabBar'
 import { Alert, BackHandler } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import HomeScreen from '../screens/HomeScreen'
+import BottomTabBar from '../components/layout/BottomTabBar'
+import StreamScreen from '../screens/StreamScreen'
+import RecentMedia from '../screens/RecentMedia'
+import GalleryScreen from '../screens/GalleryScreen'
 // import FAQScreen from '../screens/FAQScreen'
 // import AboutScreen from '../screens/AboutScreen'
 
 type MainStackParamList = {
-  Home: undefined
   Login: undefined
+  Dashboard: undefined
+  Stream: undefined
+  RecentMedia: undefined
+  GalleryStack: undefined
   Main: undefined
-  LiveControl: undefined
-  PairDeviceOnBoard: undefined
-  PairDeviceScreen: undefined
-  ScanDeviceScreen: undefined
-  VoiceToTextScreen: undefined
-  VoiceToTextRealtime: undefined
-  HistoryScreen: undefined
-  FAQScreen: undefined
-  AboutScreen: undefined
-  SoundRecording: undefined
+  Profile: undefined
 }
 
 const MainStack =
@@ -105,20 +103,28 @@ const AppNavigator = memo(
       >
         <MainStack.Navigator
           screenOptions={mainStackOptions}
-          initialRouteName={isLoggedIn ? 'Main' : 'Login'}
+          initialRouteName={'Main'}
         >
           <MainStack.Screen
             name={'Main'}
-            component={StackBottomTabBar}
+            component={BottomTabBar}
             options={{ headerShown: false }}
+          />
+          <MainStack.Screen
+            name={'Stream'}
+            component={StreamScreen}
+          />
+          <MainStack.Screen
+            name={'RecentMedia'}
+            component={RecentMedia}
+          />
+          <MainStack.Screen
+            name={'GalleryStack'}
+            component={GalleryScreen}
           />
           {/* <MainStack.Screen
             name="Login"
             component={LoginScreen}
-          />
-          <MainStack.Screen
-            name={'PairDeviceOnBoard'}
-            component={PairDeviceScreenOnBoard}
           />
           <MainStack.Screen
             name={'ScanDeviceScreen'}

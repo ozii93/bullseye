@@ -1,23 +1,33 @@
 // StackBottomTabBar.tsx
 import React, { useEffect, useRef } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import HomeScreen from '../../screens/HomeScreen'
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons'
 import { COLORS } from '../../core/theme'
 import ProfileScreen from '../../screens/ProfileScreen'
+import DashboardScreen from '../../screens/DashboardScreen'
+import GalleryScreen from '../../screens/GalleryScreen'
 
 const Tab = createBottomTabNavigator()
 
 const CustomHeader = () => (
-  <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: "space-between", width: '100%' }}>
+  <View style={{
+    flexDirection: 'row',
+    alignItems: 'center', 
+    justifyContent: "space-between",
+    width: '100%',
+    height: 40,
+  }}>
     <View>
       <Image
         source={require('../../../assets/img/logo-full.png')}
         style={{
-          width: 130,
+          width: 110,
+          height: 30,
           resizeMode: 'contain',
-          marginLeft: 20,
+          marginLeft: 15,
         }}
       />
     </View>
@@ -62,11 +72,13 @@ const CustomTabBarButton = (props: any) => {
 }
 
 export default function BottomTabBar() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         // headerShown:route.name != 'Home' ? false : true,
-        headerShown:true,
+        headerShown: true,
         headerTitle: () => <CustomHeader />,
         headerTitleAlign: 'left',
         headerStyle: {
@@ -75,10 +87,12 @@ export default function BottomTabBar() {
         tabBarIcon: ({ color, size }) => {
           let iconName: string = ''
 
-          if (route.name === 'Home') {
+          if (route.name === 'Dashboard') {
             iconName = 'home'
-          } else if (route.name === 'Support') {
-            iconName = 'devices'
+          } else if (route.name === 'Gallery') {
+            iconName = 'image-multiple'
+          } else if (route.name === 'Camera') {
+            iconName = 'stabilization'
           } else if (route.name === 'Profile') {
             iconName = 'account'
           }
@@ -86,24 +100,38 @@ export default function BottomTabBar() {
           return <MaterialDesignIcons name={iconName as any} size={size} color={color} />
         },
         tabBarStyle: {
+          position: 'absolute', // Membuat melayang
           backgroundColor: COLORS.background,
-          height: 80,
-          paddingHorizontal: 10,
-          borderColor: 'transparent'
+          borderTopWidth: 0,
+          elevation: 10,
+          height: 70,
+          borderRadius: 35,
+          marginHorizontal: 15,
+          marginBottom: insets.bottom + 10, // Jarak dari bawah layar
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.2)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.3,
+          shadowRadius: 5,
         },
         tabBarItemStyle: {
           borderRadius: 50,
-          marginHorizontal: 30,
-          marginTop: 15
+          height: 70,
+          // marginHorizontal: 30,
+          // marginTop: 15
         },
-        // tabBarActiveBackgroundColor: COLORS.secondary,
+        tabBarActiveBackgroundColor: COLORS.secondary,
+        tabBarShowLabel: false,
         tabBarButton: (props) => <CustomTabBarButton {...props} />,
         tabBarActiveTintColor: COLORS.white
-      })}
+      })
+      }
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen name="Gallery" component={GalleryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+    </ Tab.Navigator>
   )
 }
 
@@ -114,7 +142,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabButton: {
-    width: 60,
+    width: 55,
     height: 45,
     borderRadius: 12,
     alignItems: 'center',
