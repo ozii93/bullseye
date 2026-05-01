@@ -7,8 +7,9 @@ import {
   Image, 
   Dimensions,
   Text,
+  StatusBar,
 } from 'react-native';
-import { IconButton } from 'react-native-paper';
+import { Surface, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons'
 import RNFS from 'react-native-fs';
@@ -21,9 +22,6 @@ const GalleryScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'local' | 'device'>('local');
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
 
-  // ===============================
-  // LOAD REAL LOCAL MEDIA
-  // ===============================
   useEffect(() => {
     const loadMedia = async () => {
       try {
@@ -34,31 +32,23 @@ const GalleryScreen = ({ navigation }: any) => {
           f.name.endsWith('.mp4')
         );
         
-        // Urutkan dari yang terbaru
         media.sort((a, b) => {
           const dateA = a.mtime ? new Date(a.mtime).getTime() : 0;
           const dateB = b.mtime ? new Date(b.mtime).getTime() : 0;
           return dateB - dateA;
         });
 
-        // Set state dengan format file://
         setMediaFiles(media.map(f => `file://${f.path}`));
       } catch (error) {
         console.log('❌ Error load gallery:', error);
       }
     };
 
-    // Load saat screen dibuka
     loadMedia();
-
-    // Auto-refresh kalau user abis hapus foto di RecentMedia dan balik ke sini
     const unsubscribe = navigation.addListener('focus', loadMedia);
     return unsubscribe;
   }, [navigation]);
 
-  // ===============================
-  // RENDER ITEM (GRID)
-  // ===============================
   const renderMediaItem = ({ item }: { item: string }) => {
     const isVideo = item.endsWith('.mp4');
 
@@ -66,82 +56,65 @@ const GalleryScreen = ({ navigation }: any) => {
       <TouchableOpacity 
         style={styles.mediaItem}
         activeOpacity={0.8}
-        // Lempar URI ke RecentMedia biar dibuka versi Fullscreen/Swipe-nya
         onPress={() => navigation.navigate('RecentMedia', { uri: item })}
       >
-        <Image source={{ uri: item }} style={styles.thumbnail} />
-        
-        {isVideo && (
-          <View style={styles.videoIndicator}>
-            <MaterialDesignIcons name="play-circle-outline" size={32} color="#FFF" />
-            <View style={styles.videoBadge}>
-              <Text style={styles.videoBadgeText}>VIDEO</Text>
+        <Surface style={styles.thumbnailFrame} elevation={2}>
+          <Image source={{ uri: item }} style={styles.thumbnail} />
+          {isVideo && (
+            <View style={styles.videoOverlay}>
+              <MaterialDesignIcons name="play-circle-outline" size={28} color="#FFF" />
             </View>
-          </View>
-        )}
+          )}
+        </Surface>
       </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 1. MODERN TACTICAL HEADER */}
+      <StatusBar barStyle="light-content" />
+      
+      {/* Header */}
       <View style={styles.header}>
         <IconButton 
-          icon="arrow-left" 
+          icon="chevron-left" 
           iconColor="#FFF" 
-          size={28}
+          size={32}
           onPress={() => navigation.goBack()} 
         />
-        <Text style={styles.title}>MEDIA GALLERY</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>INTELLIGENCE ARCHIVE</Text>
+          <Text style={styles.subtitle}>TACTICAL MEDIA STORAGE</Text>
+        </View>
         <IconButton 
-          icon="dots-vertical" 
-          iconColor="#FFF" 
-          size={28} 
+          icon="shield-search" 
+          iconColor="#D32F2F" 
+          size={24} 
           onPress={() => {}} 
         />
       </View>
 
-      {/* 2. SLEEK TAB SWITCHER */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'local' && styles.activeTabButton]}
-          onPress={() => setActiveTab('local')}
-          activeOpacity={0.7}
-        >
-          <MaterialDesignIcons 
-            name="folder-image" 
-            size={20} 
-            color={activeTab === 'local' ? '#00E5FF' : '#A0A0A5'} 
-            style={styles.tabIcon}
-          />
-          <Text style={[styles.tabText, activeTab === 'local' && styles.activeTabText]}>
-            LOCAL
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.tabButton, activeTab === 'device' && styles.activeTabButton]}
-          onPress={() => setActiveTab('device')}
-          activeOpacity={0.7}
-        >
-          <MaterialDesignIcons 
-            name="cellphone" 
-            size={20} 
-            color={activeTab === 'device' ? '#00E5FF' : '#A0A0A5'} 
-            style={styles.tabIcon}
-          />
-          <Text style={[styles.tabText, activeTab === 'device' && styles.activeTabText]}>
-            DEVICE
-          </Text>
-        </TouchableOpacity>
+      {/* Elite Tabs */}
+      <View style={styles.tabWrapper}>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'local' && styles.activeTab]}
+            onPress={() => setActiveTab('local')}
+          >
+            <Text style={[styles.tabText, activeTab === 'local' && styles.activeTabText]}>LOCAL ASSETS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'device' && styles.activeTab]}
+            onPress={() => setActiveTab('device')}
+          >
+            <Text style={[styles.tabText, activeTab === 'device' && styles.activeTabText]}>REMOTE DEVICE</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* 3. CONTENT AREA */}
-      <View style={styles.contentArea}>
-        
-        {/* TAB: LOCAL */}
-        {activeTab === 'local' && (
+      {/* Content */}
+      <View style={styles.content}>
+        {activeTab === 'local' ? (
           mediaFiles.length > 0 ? (
             <FlatList
               data={mediaFiles}
@@ -153,166 +126,180 @@ const GalleryScreen = ({ navigation }: any) => {
             />
           ) : (
             <View style={styles.emptyContainer}>
-              <MaterialDesignIcons name="image-off-outline" size={80} color="rgba(255,255,255,0.1)" />
-              <Text style={styles.emptyText}>Belum ada media yang direkam</Text>
+              <MaterialDesignIcons name="database-off-outline" size={60} color="rgba(255,255,255,0.05)" />
+              <Text style={styles.emptyText}>NO DATA DETECTED IN STORAGE</Text>
             </View>
           )
-        )}
-
-        {/* TAB: DEVICE */}
-        {activeTab === 'device' && (
-          <View style={styles.emptyContainer}>
-            <View style={styles.devIconContainer}>
-              <MaterialDesignIcons name="hammer-wrench" size={60} color="#00E5FF" />
-            </View>
-            <Text style={styles.devTitle}>Under Development</Text>
-            <Text style={styles.devSubtitle}>
-              Fitur dari gallery device ini masih dalam tahap pengembangan.
-            </Text>
+        ) : (
+          <View style={styles.devContainer}>
+            <Surface style={styles.devCard} elevation={4}>
+              <MaterialDesignIcons name="access-point-network-off" size={50} color="#D32F2F" />
+              <Text style={styles.devTitle}>REMOTE ACCESS RESTRICTED</Text>
+              <Text style={styles.devSubtitle}>
+                DIRECT CLOUD SYNCHRONIZATION IS CURRENTLY UNDER CALIBRATION.
+              </Text>
+              <View style={styles.progressBar}>
+                <View style={styles.progressFill} />
+              </View>
+              <Text style={styles.progressText}>UPDATING SYSTEM... 65%</Text>
+            </Surface>
           </View>
         )}
-
       </View>
     </SafeAreaView>
   );
 };
 
-/* =========================================================
-   STYLE (MODERN DARK THEME)
-========================================================= */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000', // Pitch black
+    backgroundColor: '#05070a',
   },
-  
-  // HEADER
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginBottom: 20,
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '900',
     color: '#FFF',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
   },
-
-  // TABS
+  subtitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#D32F2F',
+    letterSpacing: 1.5,
+    marginTop: 2,
+  },
+  tabWrapper: {
+    paddingHorizontal: 20,
+    marginBottom: 25,
+  },
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 16,
-    marginVertical: 15,
-    backgroundColor: 'rgba(28,28,30,0.8)',
-    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
     padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 12,
-    borderRadius: 10,
+    alignItems: 'center',
+    borderRadius: 8,
   },
-  activeTabButton: {
-    backgroundColor: '#1C1C1E', // Warna tab aktif
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  tabIcon: {
-    marginRight: 8,
+  activeTab: {
+    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(211, 47, 47, 0.3)',
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#A0A0A5',
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 1,
   },
   activeTabText: {
-    color: '#00E5FF', // Aksen Cyan
-    fontWeight: 'bold',
+    color: '#FFF',
   },
-
-  // CONTENT
-  contentArea: {
+  content: {
     flex: 1,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   mediaItem: {
     width: ITEM_SIZE,
     height: ITEM_SIZE,
-    padding: 1, // Memberikan efek border/grid
+    padding: 2,
+  },
+  thumbnailFrame: {
+    flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   thumbnail: {
     flex: 1,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#0c1018',
   },
-  
-  // VIDEO OVERLAY
-  videoIndicator: {
+  videoOverlay: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)', // Sedikit gelap biar icon play kelihatan
   },
-  videoBadge: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  videoBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-
-  // EMPTY & DEV STATES
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    padding: 40,
   },
   emptyText: {
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 15,
-    fontSize: 16,
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginTop: 20,
     textAlign: 'center',
   },
-  devIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+  devContainer: {
+    flex: 1,
+    padding: 30,
     justifyContent: 'center',
+  },
+  devCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 24,
+    padding: 40,
     alignItems: 'center',
-    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   devTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
     color: '#FFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginTop: 20,
     marginBottom: 10,
+    textAlign: 'center',
   },
   devSubtitle: {
-    fontSize: 15,
-    color: '#A0A0A5',
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 18,
+    marginBottom: 30,
   },
+  progressBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 2,
+    marginBottom: 10,
+  },
+  progressFill: {
+    width: '65%',
+    height: '100%',
+    backgroundColor: '#D32F2F',
+    borderRadius: 2,
+  },
+  progressText: {
+    color: '#D32F2F',
+    fontSize: 8,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  }
 });
 
 export default GalleryScreen;

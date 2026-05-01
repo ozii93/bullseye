@@ -2,24 +2,19 @@ import {
   NavigationContainer,
   NavigationContainerRef,
 } from '@react-navigation/native'
-import { createStackNavigator } from '@react-navigation/stack'
 import { memo, useEffect, useRef } from 'react'
-// import LoginScreen from '../screens/LoginScreen'
-// import LiveControlScreen from '../screens/LiveControlScreen'
-// import PairDeviceScreenOnBoard from '../screens/PairDeviceScreenOnBoard'
-// import PairDeviceScreen from '../screens/PairDeviceScreen'
-// import ScanDevicesScreen from '../screens/ScanDeviceScreen'
+import LoginScreen from '../screens/LoginScreen'
 import React from 'react'
-import StackBottomTabBar from '../components/layout/StackBottomTabBar'
 import { Alert, BackHandler } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import HomeScreen from '../screens/HomeScreen'
 import BottomTabBar from '../components/layout/BottomTabBar'
 import StreamScreen from '../screens/StreamScreen'
 import RecentMedia from '../screens/RecentMedia'
 import GalleryScreen from '../screens/GalleryScreen'
-// import FAQScreen from '../screens/FAQScreen'
-// import AboutScreen from '../screens/AboutScreen'
+import QuickUserGuideScreen from '../screens/QuickUserGuideScreen'
+import PDFViewerScreen from '../screens/PDFViewerScreen'
+import FAQScreen from '../screens/FAQScreen'
+import AboutScreen from '../screens/AboutScreen'
 
 type MainStackParamList = {
   Login: undefined
@@ -29,21 +24,20 @@ type MainStackParamList = {
   GalleryStack: undefined
   Main: undefined
   Profile: undefined
+  QuickUserGuide: undefined
+  PDFViewer: { source: any, title: string }
+  FAQ: undefined
+  About: undefined
 }
 
-const MainStack =
-  createNativeStackNavigator<MainStackParamList>()
+const MainStack = createNativeStackNavigator<MainStackParamList>()
 
-// Main App Navigator
 const AppNavigator = memo(
   (props: { isLoggedIn: boolean }) => {
     const { isLoggedIn } = props
 
-    const navigationRef =
-      useRef<NavigationContainerRef<any>>(null)
-    const routeNameRef = useRef<string | undefined>(
-      undefined
-    )
+    const navigationRef = useRef<NavigationContainerRef<any>>(null)
+    const routeNameRef = useRef<string | undefined>(undefined)
 
     const mainStackOptions = {
       headerShown: false,
@@ -54,7 +48,8 @@ const AppNavigator = memo(
     const backAction = () => {
       if (
         routeNameRef.current == 'Home' ||
-        routeNameRef.current == 'Login'
+        routeNameRef.current == 'Login' ||
+        routeNameRef.current == 'Main'
       ) {
         Alert.alert(
           'Hold on!',
@@ -82,7 +77,6 @@ const AppNavigator = memo(
         'hardwareBackPress',
         backAction
       )
-      console.log(backHandler)
       return () => {
         backHandler.remove()
       }
@@ -101,67 +95,25 @@ const AppNavigator = memo(
           console.log("Route changed:", currentRouteName);
         }}
       >
-        <MainStack.Navigator
-          screenOptions={mainStackOptions}
-          initialRouteName={'Main'}
-        >
-          <MainStack.Screen
-            name={'Main'}
-            component={BottomTabBar}
-            options={{ headerShown: false }}
-          />
-          <MainStack.Screen
-            name={'Stream'}
-            component={StreamScreen}
-          />
-          <MainStack.Screen
-            name={'RecentMedia'}
-            component={RecentMedia}
-          />
-          <MainStack.Screen
-            name={'GalleryStack'}
-            component={GalleryScreen}
-          />
-          {/* <MainStack.Screen
-            name="Login"
-            component={LoginScreen}
-          />
-          <MainStack.Screen
-            name={'ScanDeviceScreen'}
-            component={ScanDevicesScreen}
-          />
-          <MainStack.Screen
-            name={'PairDeviceScreen'}
-            component={PairDeviceScreen}
-          />
-          <MainStack.Screen
-            name={'LiveControl'}
-            component={LiveControlScreen}
-          />
-          <MainStack.Screen
-            name={'VoiceToTextScreen'}
-            component={VoiceToTextScreen}
-          />
-          <MainStack.Screen
-            name={'VoiceToTextRealtime'}
-            component={VoiceToTextRealtime}
-          />
-          <MainStack.Screen
-            name='HistoryScreen'
-            component={HistoryScreen}
-          />
-          <MainStack.Screen
-            name='FAQScreen'
-            component={FAQScreen}
-          />
-          <MainStack.Screen
-            name='AboutScreen'
-            component={AboutScreen}
-          />
-          <MainStack.Screen
-            name='SoundRecording'
-            component={SoundRecording}
-          /> */}
+        <MainStack.Navigator screenOptions={mainStackOptions}>
+          {isLoggedIn ? (
+            <>
+              <MainStack.Screen
+                name={'Main'}
+                component={BottomTabBar}
+                options={{ headerShown: false }}
+              />
+              <MainStack.Screen name={'Stream'} component={StreamScreen} />
+              <MainStack.Screen name={'RecentMedia'} component={RecentMedia} />
+              <MainStack.Screen name={'GalleryStack'} component={GalleryScreen} />
+              <MainStack.Screen name={'QuickUserGuide'} component={QuickUserGuideScreen} />
+              <MainStack.Screen name={'PDFViewer'} component={PDFViewerScreen} />
+              <MainStack.Screen name={'FAQ'} component={FAQScreen} />
+              <MainStack.Screen name={'About'} component={AboutScreen} />
+            </>
+          ) : (
+            <MainStack.Screen name="Login" component={LoginScreen} />
+          )}
         </MainStack.Navigator>
       </NavigationContainer>
     )

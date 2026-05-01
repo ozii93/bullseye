@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "719621040218",
+    "project_id": "bullseye-4a48c",
+    "storage_bucket": "bullseye-4a48c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:719621040218:android:b8bd1ff65937ce3dbad063",
+        "android_client_info": {
+          "package_name": "com.bullseye.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "719621040218-ddr3osnsi1sfl8k1uktn44l16ld3gfuf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bullseye.app",
+            "certificate_hash": "7bf3cbdd12c257358de2978614297b13a9505b09"
+          }
+        },
+        {
+          "client_id": "719621040218-8h04igc9o1f573mkfq3vkmvgvmj8tbvc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrQothdG1VNZ3ZE6PNrhK-ot-X7PwsT7o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "719621040218-8h04igc9o1f573mkfq3vkmvgvmj8tbvc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

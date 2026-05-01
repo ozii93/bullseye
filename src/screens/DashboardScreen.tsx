@@ -1,11 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, DeviceEventEmitter, Linking, Platform } from 'react-native';
-import { Text, Card, useTheme, Avatar, Button } from 'react-native-paper';
+import { 
+  View, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  Image, 
+  DeviceEventEmitter, 
+  Linking, 
+  Platform,
+  Dimensions,
+  StatusBar
+} from 'react-native';
+import { Text, Surface, Avatar, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
+import { useAuth } from '../provider/AuthContext';
+
+const { width } = Dimensions.get('window');
 
 const DashboardScreen = ({ navigation, isFocused }: any) => {
-  const theme = useTheme();
+  const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [deviceName, setDeviceName] = useState('BullsEye Thermal Device');
 
@@ -17,24 +31,19 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
         
-        // Coba ambil info device
         const response = await fetch('http://192.168.42.1/api/v1/system/deviceinfo', {
           method: 'GET',
           signal: controller.signal
         });
         
-        console.log(response)
         clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
-          // Biasanya field-nya adalah 'deviceName' atau 'model'
           const name = data.deviceName || data.model || data.hostname || 'BullsEye Device';
           setDeviceName(name);
           setIsConnected(true);
         } else {
-          // Jika endpoint info gagal tapi server ada (misal endpoint salah), 
-          // kita tetap anggap connect tapi pakai nama default/sebelumnya
           setIsConnected(true);
         }
       } catch (error) {
@@ -43,12 +52,9 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
     };
 
     checkConnection();
-    console.log('Init Dashboard Screen')
-    const interval = setInterval(checkConnection, 5000); // Check every 5 seconds
+    const interval = setInterval(checkConnection, 5000);
     return () => clearInterval(interval);
   }, [isFocused]);
-
-
 
   const openWifiSettings = () => {
     if (Platform.OS === 'android') {
@@ -59,89 +65,115 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* Header Section */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>Commander Hawk</Text>
+            <Text style={styles.welcomeText}>OPERATIONAL STATUS</Text>
+            <Text style={styles.userName}>{user?.name?.toUpperCase() || 'COMMANDER HAWK'}</Text>
           </View>
-          <Avatar.Image 
-            size={50} 
-            source={{ uri: 'https://i.pravatar.cc/150?u=hawk' }} 
-            style={styles.avatar}
-          />
+          <View style={styles.avatarFrame}>
+            <Avatar.Image 
+              size={54} 
+              source={{ uri: user?.photo || 'https://i.pravatar.cc/150?u=hawk' }} 
+            />
+          </View>
         </View>
 
-        {/* Device Info & Status */}
-        <Text style={styles.sectionTitle}>Device Status</Text>
-        <Card style={styles.connectionCard}>
-          <Card.Content style={styles.connectionContent}>
-            <View style={styles.statusInfo}>
-              <View style={[styles.statusIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
-              <View>
-                <Text style={styles.deviceName}>{deviceName}</Text>
-                <Text style={styles.statusText}>{isConnected ? 'CONNECTED' : 'DISCONNECTED'}</Text>
-              </View>
+        {/* System Status Display */}
+        <Surface style={styles.statusPanel} elevation={2}>
+          <View style={styles.panelHeader}>
+            <MaterialDesignIcons name="shield-sync" size={16} color="#D32F2F" />
+            <Text style={styles.panelTitle}>SYSTEM CONNECTIVITY</Text>
+            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4CAF50' : '#D32F2F' }]} />
+          </View>
+          
+          <View style={styles.statusMain}>
+            <View style={styles.deviceInfo}>
+              <Text style={styles.deviceName}>{deviceName.toUpperCase()}</Text>
+              <Text style={[styles.statusStatus, { color: isConnected ? '#4CAF50' : '#D32F2F' }]}>
+                {isConnected ? 'SIGNAL ACQUIRED' : 'SIGNAL LOST'}
+              </Text>
             </View>
-            <MaterialDesignIcons 
-              name={isConnected ? "wifi-check" : "wifi-off"} 
-              size={32} 
-              color={isConnected ? '#4CAF50' : '#F44336'} 
-            />
-          </Card.Content>
-        </Card>
+            <TouchableOpacity onPress={openWifiSettings} style={styles.linkButton}>
+              <MaterialDesignIcons 
+                name={isConnected ? "wifi-check" : "wifi-alert"} 
+                size={32} 
+                color={isConnected ? '#4CAF50' : '#D32F2F'} 
+              />
+            </TouchableOpacity>
+          </View>
 
-        {/* Action Button */}
-        <Button 
-          mode="contained" 
-          onPress={openWifiSettings}
-          style={styles.connectButton}
-          contentStyle={styles.connectButtonContent}
-          icon="router-wireless"
-          buttonColor="#2196F3"
-        >
-          CONNECT THE DEVICE
-        </Button>
+          <View style={styles.panelFooter}>
+            <View style={styles.footerLine} />
+            <Text style={styles.footerText}>ENCRYPTED CHANNEL 09-B</Text>
+            <View style={styles.footerLine} />
+          </View>
+        </Surface>
 
-        {/* Live Preview Placeholder */}
-        <Text style={styles.sectionTitle}>Main Monitor</Text>
+        {/* Primary Monitor Section */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.accentLine} />
+          <Text style={styles.sectionTitle}>PRIMARY MONITOR</Text>
+        </View>
+
         <TouchableOpacity 
           activeOpacity={0.9}
           onPress={() => navigation.navigate('Stream')}
-          style={styles.previewContainer}
+          style={styles.monitorContainer}
         >
-          <View style={styles.previewPlaceholder}>
-            <MaterialDesignIcons name="play-circle" size={60} color="rgba(255,255,255,0.8)" />
-            <View style={styles.liveBadge}>
-              <View style={styles.redDot} />
-              <Text style={styles.liveBadgeText}>TAP TO MONITOR</Text>
+          <Surface style={styles.monitorFrame} elevation={4}>
+            <View style={styles.cornerTL} />
+            <View style={styles.cornerTR} />
+            <View style={styles.cornerBL} />
+            <View style={styles.cornerBR} />
+            
+            <View style={styles.monitorContent}>
+              <MaterialDesignIcons name="access-point" size={40} color="rgba(255,255,255,0.2)" />
+              <View style={styles.tapBadge}>
+                <Text style={styles.tapText}>INITIALIZE LIVE STREAM</Text>
+              </View>
             </View>
-          </View>
+
+            <View style={styles.monitorOverlay}>
+              <View style={styles.recBadge}>
+                <View style={styles.recDot} />
+                <Text style={styles.recText}>LIVE FEED</Text>
+              </View>
+              <Text style={styles.monitorTime}>00:00:00:00</Text>
+            </View>
+          </Surface>
         </TouchableOpacity>
 
-        {/* Features Grid */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        {/* Quick Actions Grid */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.accentLine} />
+          <Text style={styles.sectionTitle}>TACTICAL TOOLS</Text>
+        </View>
+
         <View style={styles.grid}>
           {[
-            { id: 1, label: 'Recordings', icon: 'folder-video', color: '#FF9800' },
-            { id: 3, label: 'Gallery', icon: 'image-multiple', color: '#2196F3' },
+            { id: 1, label: 'RECORDINGS', icon: 'video-vintage', color: '#FF9800' },
+            { id: 2, label: 'GALLERY', icon: 'view-grid-outline', color: '#00E5FF' },
           ].map((item) => (
             <TouchableOpacity 
               key={item.id} 
               style={styles.gridItem}
               onPress={() => {
-                if (item.label === 'Gallery') {
+                if (item.label === 'GALLERY') {
                   DeviceEventEmitter.emit('changeTab', 'gallery');
                 }
               }}
             >
-              <View style={[styles.iconBox, { backgroundColor: item.color + '20' }]}>
-                <MaterialDesignIcons name={item.icon as any} size={28} color={item.color} />
-              </View>
-              <Text style={styles.gridLabel}>{item.label}</Text>
+              <Surface style={styles.gridSurface} elevation={1}>
+                <View style={[styles.iconContainer, { backgroundColor: item.color + '10' }]}>
+                  <MaterialDesignIcons name={item.icon as any} size={28} color={item.color} />
+                </View>
+                <Text style={styles.gridLabel}>{item.label}</Text>
+              </Surface>
             </TouchableOpacity>
           ))}
         </View>
@@ -154,143 +186,225 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#05070a',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 100,
+    padding: 24,
+    paddingBottom: 120,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 40,
   },
   welcomeText: {
-    fontSize: 16,
-    opacity: 0.7,
-    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 4,
   },
   userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '900',
     color: '#FFF',
+    letterSpacing: 1,
   },
-  avatar: {
-    borderWidth: 2,
-    borderColor: '#00E5FF',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 15,
-  },
-  connectionCard: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 16,
-    marginBottom: 20,
+  avatarFrame: {
+    padding: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: '#00E5FF',
+    borderRadius: 32,
   },
-  connectionContent: {
+  statusPanel: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 40,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  panelTitle: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    marginLeft: 10,
+    flex: 1,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+  },
+  statusMain: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
+    marginBottom: 20,
   },
-  statusInfo: {
+  deviceInfo: {
+    flex: 1,
+  },
+  deviceName: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: 1,
+  },
+  statusStatus: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 4,
+    letterSpacing: 1,
+  },
+  panelFooter: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 15,
+  footerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  deviceName: {
-    fontSize: 16,
+  footerText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 8,
     fontWeight: 'bold',
+    letterSpacing: 2,
+    marginHorizontal: 15,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  accentLine: {
+    width: 4,
+    height: 16,
+    backgroundColor: '#D32F2F',
+    marginRight: 12,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '900',
     color: '#FFF',
+    letterSpacing: 2,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 2,
-    opacity: 0.8,
-    color: '#FFF',
-  },
-  connectButton: {
-    borderRadius: 12,
-    marginBottom: 30,
-    elevation: 4,
-  },
-  connectButtonContent: {
-    paddingVertical: 8,
-  },
-  previewContainer: {
+  monitorContainer: {
     width: '100%',
-    height: 200,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 30,
-    backgroundColor: '#333',
+    height: 220,
+    marginBottom: 40,
   },
-  previewPlaceholder: {
+  monitorFrame: {
+    flex: 1,
+    backgroundColor: '#0c1018',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    padding: 2,
+    overflow: 'hidden',
+  },
+  cornerTL: { position: 'absolute', top: 15, left: 15, width: 20, height: 20, borderTopWidth: 1, borderLeftWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
+  cornerTR: { position: 'absolute', top: 15, right: 15, width: 20, height: 20, borderTopWidth: 1, borderRightWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
+  cornerBL: { position: 'absolute', bottom: 15, left: 15, width: 20, height: 20, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
+  cornerBR: { position: 'absolute', bottom: 15, right: 15, width: 20, height: 20, borderBottomWidth: 1, borderRightWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
+  monitorContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  liveBadge: {
+  tapBadge: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  tapText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+  },
+  monitorOverlay: {
     position: 'absolute',
-    top: 15,
-    left: 15,
+    top: 25,
+    left: 25,
+    right: 25,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  redDot: {
+  recDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#D32F2F',
     marginRight: 6,
   },
-  liveBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
+  recText: {
+    color: '#D32F2F',
+    fontSize: 9,
     fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  monitorTime: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 10,
+    fontFamily: 'monospace',
   },
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   gridItem: {
     width: '48%',
-    backgroundColor: '#1E1E1E',
+  },
+  gridSurface: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
-    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  iconBox: {
+  iconContainer: {
     width: 60,
     height: 60,
-    borderRadius: 15,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   gridLabel: {
     color: '#FFF',
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 1.5,
   },
+  linkButton: {
+    padding: 10,
+  }
 });
 
 export default DashboardScreen;
-
