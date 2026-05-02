@@ -136,7 +136,7 @@ const HomeScreen = ({ navigation, isFocused }: any) => {
   const [activePalette, setActivePalette] = useState(0);
   const [playerKey, setPlayerKey] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
-  
+
   // State lokal untuk mengontrol render player agar tidak langsung mati saat pindah menu
   const [renderPlayer, setRenderPlayer] = useState(isFocused);
 
@@ -158,179 +158,179 @@ const HomeScreen = ({ navigation, isFocused }: any) => {
     console.log('Palette Changed:', palette.name);
   };
 
-  return (
-    <View style={styles.mainContainer}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+  // return (
+  //   // <View style={styles.mainContainer}>
+  //   //   <StatusBar
+  //   //     barStyle="light-content"
+  //   //     backgroundColor="transparent"
+  //   //     translucent
+  //   //   />
 
-      {renderPlayer && (
-        <VLCPlayer
-          key={playerKey}
-          style={styles.videoStream}
-          videoAspectRatio="16:9"
-          source={{
-            uri: 'rtsp://192.168.42.1:8554/video',
+  //   //   {renderPlayer && (
+  //   //     <VLCPlayer
+  //   //       key={playerKey}
+  //   //       style={styles.videoStream}
+  //   //       videoAspectRatio="16:9"
+  //   //       source={{
+  //   //         uri: 'rtsp://192.168.42.1:8554/video',
 
-            initOptions: [
-              '--network-caching=150',
-              '--rtsp-caching=150',
-              '--live-caching=150',
-              '--clock-jitter=0',
-              '--clock-synchro=0',
-              '--drop-late-frames',
-              '--skip-frames',
-              '--avcodec-hw=any',
-              '--no-stats',
-              '--no-osd',
-            ]
-          }}
-          autoplay
-          onPlaying={() => console.log('🔥 RTSP STREAM CONNECTED & PLAYING!')}
-          onError={() => {
-            setTimeout(() => {
-              setPlayerKey(v => v + 1);
-            }, 2000);
-          }}
-        />
-      )}
-
-
+  //   //         initOptions: [
+  //   //           '--network-caching=150',
+  //   //           '--rtsp-caching=150',
+  //   //           '--live-caching=150',
+  //   //           '--clock-jitter=0',
+  //   //           '--clock-synchro=0',
+  //   //           '--drop-late-frames',
+  //   //           '--skip-frames',
+  //   //           '--avcodec-hw=any',
+  //   //           '--no-stats',
+  //   //           '--no-osd',
+  //   //         ]
+  //   //       }}
+  //   //       autoplay
+  //   //       onPlaying={() => console.log('🔥 RTSP STREAM CONNECTED & PLAYING!')}
+  //   //       onError={() => {
+  //   //         setTimeout(() => {
+  //   //           setPlayerKey(v => v + 1);
+  //   //         }, 2000);
+  //   //       }}
+  //   //     />
+  //   //   )}
 
 
-      <SafeAreaView style={styles.overlayContainer} edges={['top', 'bottom']}>
-        {/* HEADER */}
-        <View style={styles.floatingHeader}>
-          <View style={styles.headerLeft}>
-            <IconButton
-              icon="chevron-left"
-              iconColor="#FFF"
-              size={28}
-              onPress={() => {
-                // Berikan perintah pindah tab segera
-                DeviceEventEmitter.emit('changeTab', 'dashboard');
-              }}
-              rippleColor="rgba(255, 255, 255, 0.2)"
-            />
 
-          </View>
 
-          <View style={styles.statusBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.statusText}>LIVE</Text>
-          </View>
+  //   //   <SafeAreaView style={styles.overlayContainer} edges={['top', 'bottom']}>
+  //   //     {/* HEADER */}
+  //   //     <View style={styles.floatingHeader}>
+  //   //       <View style={styles.headerLeft}>
+  //   //         <IconButton
+  //   //           icon="chevron-left"
+  //   //           iconColor="#FFF"
+  //   //           size={28}
+  //   //           onPress={() => {
+  //   //             // Berikan perintah pindah tab segera
+  //   //             DeviceEventEmitter.emit('changeTab', 'dashboard');
+  //   //           }}
+  //   //           rippleColor="rgba(255, 255, 255, 0.2)"
+  //   //         />
 
-          <View style={styles.headerRight}>
-            <IconButton
-              icon="cog"
-              iconColor="#FFF"
-              size={24}
-              onPress={() => { }}
-            />
-          </View>
-        </View>
+  //   //       </View>
 
-        {/* MIDDLE INFO */}
-        <View style={styles.midInfo}>
-          <Text style={styles.isoText}>ISO 400</Text>
-          <Text style={styles.isoText}>1/60</Text>
-          <Text style={styles.isoText}>F1.8</Text>
-        </View>
+  //   //       <View style={styles.statusBadge}>
+  //   //         <View style={styles.liveDot} />
+  //   //         <Text style={styles.statusText}>LIVE</Text>
+  //   //       </View>
 
-        {/* BOTTOM SECTION */}
-        <View style={styles.bottomSection}>
-          {isPaletteVisible && (
-            <View style={styles.paletteWrapper}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.paletteScroll}
-              >
-                {PALETTES.map((item) => {
-                  const isActive = activePalette === item.uiId;
-                  return (
-                    <TouchableOpacity
-                      key={item.uiId}
-                      activeOpacity={0.7}
-                      style={[
-                        styles.palettePill,
-                        isActive && styles.activePalettePill,
-                      ]}
-                      onPress={() => handleChangePalette(item)}
-                    >
-                      <View
-                        style={[
-                          styles.colorDot,
-                          { backgroundColor: item.color },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.paletteText,
-                          isActive && styles.activePaletteText,
-                        ]}
-                      >
-                        {item.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
+  //   //       <View style={styles.headerRight}>
+  //   //         <IconButton
+  //   //           icon="cog"
+  //   //           iconColor="#FFF"
+  //   //           size={24}
+  //   //           onPress={() => { }}
+  //   //         />
+  //   //       </View>
+  //   //     </View>
 
-          <View style={styles.bottomDock}>
-            <View style={styles.dockItem}>
-              <TouchableOpacity style={styles.galleryButton}>
-                <View style={styles.galleryThumb}>
-                  <View style={styles.galleryInner} />
-                </View>
-              </TouchableOpacity>
-            </View>
+  //   //     {/* MIDDLE INFO */}
+  //   //     <View style={styles.midInfo}>
+  //   //       <Text style={styles.isoText}>ISO 400</Text>
+  //   //       <Text style={styles.isoText}>1/60</Text>
+  //   //       <Text style={styles.isoText}>F1.8</Text>
+  //   //     </View>
 
-            <View style={styles.dockItem}>
-              <IconButton
-                icon={isRecording ? "stop-circle" : "video-outline"}
-                iconColor={isRecording ? "#FF3B30" : "#FFF"}
-                size={30}
-                onPress={() => setIsRecording(!isRecording)}
-              />
-            </View>
+  //   //     {/* BOTTOM SECTION */}
+  //   //     <View style={styles.bottomSection}>
+  //   //       {isPaletteVisible && (
+  //   //         <View style={styles.paletteWrapper}>
+  //   //           <ScrollView
+  //   //             horizontal
+  //   //             showsHorizontalScrollIndicator={false}
+  //   //             contentContainerStyle={styles.paletteScroll}
+  //   //           >
+  //   //             {PALETTES.map((item) => {
+  //   //               const isActive = activePalette === item.uiId;
+  //   //               return (
+  //   //                 <TouchableOpacity
+  //   //                   key={item.uiId}
+  //   //                   activeOpacity={0.7}
+  //   //                   style={[
+  //   //                     styles.palettePill,
+  //   //                     isActive && styles.activePalettePill,
+  //   //                   ]}
+  //   //                   onPress={() => handleChangePalette(item)}
+  //   //                 >
+  //   //                   <View
+  //   //                     style={[
+  //   //                       styles.colorDot,
+  //   //                       { backgroundColor: item.color },
+  //   //                     ]}
+  //   //                   />
+  //   //                   <Text
+  //   //                     style={[
+  //   //                       styles.paletteText,
+  //   //                       isActive && styles.activePaletteText,
+  //   //                     ]}
+  //   //                   >
+  //   //                     {item.name}
+  //   //                   </Text>
+  //   //                 </TouchableOpacity>
+  //   //               );
+  //   //             })}
+  //   //           </ScrollView>
+  //   //         </View>
+  //   //       )}
 
-            <View style={styles.dockItem}>
-              <TouchableOpacity
-                style={styles.shutterOuter}
-                activeOpacity={0.7}
-                onPress={() => console.log('Capture')}
-              >
-                <View style={styles.shutterInner} />
-              </TouchableOpacity>
-            </View>
+  //   //       <View style={styles.bottomDock}>
+  //   //         <View style={styles.dockItem}>
+  //   //           <TouchableOpacity style={styles.galleryButton}>
+  //   //             <View style={styles.galleryThumb}>
+  //   //               <View style={styles.galleryInner} />
+  //   //             </View>
+  //   //           </TouchableOpacity>
+  //   //         </View>
 
-            <View style={styles.dockItem}>
-              <IconButton
-                icon="tune-variant"
-                iconColor="#FFF"
-                size={30}
-                onPress={() => { }}
-              />
-            </View>
+  //   //         <View style={styles.dockItem}>
+  //   //           <IconButton
+  //   //             icon={isRecording ? "stop-circle" : "video-outline"}
+  //   //             iconColor={isRecording ? "#FF3B30" : "#FFF"}
+  //   //             size={30}
+  //   //             onPress={() => setIsRecording(!isRecording)}
+  //   //           />
+  //   //         </View>
 
-            <View style={styles.dockItem}>
-              <IconButton
-                icon="palette"
-                iconColor={isPaletteVisible ? '#00E5FF' : '#FFF'}
-                size={30}
-                onPress={() => setIsPaletteVisible(!isPaletteVisible)}
-              />
-            </View>
-          </View>
-        </View>
-      </SafeAreaView>
-    </View>
-  );
+  //   //         <View style={styles.dockItem}>
+  //   //           <TouchableOpacity
+  //   //             style={styles.shutterOuter}
+  //   //             activeOpacity={0.7}
+  //   //             onPress={() => console.log('Capture')}
+  //   //           >
+  //   //             <View style={styles.shutterInner} />
+  //   //           </TouchableOpacity>
+  //   //         </View>
+
+  //   //         <View style={styles.dockItem}>
+  //   //           <IconButton
+  //   //             icon="tune-variant"
+  //   //             iconColor="#FFF"
+  //   //             size={30}
+  //   //             onPress={() => { }}
+  //   //           />
+  //   //         </View>
+
+  //   //         <View style={styles.dockItem}>
+  //   //           <IconButton
+  //   //             icon="palette"
+  //   //             iconColor={isPaletteVisible ? '#00E5FF' : '#FFF'}
+  //   //             size={30}
+  //   //             onPress={() => setIsPaletteVisible(!isPaletteVisible)}
+  //   //           />
+  //   //         </View>
+  //   //       </View>
+  //   //     </View>
+  //   //   </SafeAreaView>
+  //   // </View>
+  // );
 };
 
 export default HomeScreen;

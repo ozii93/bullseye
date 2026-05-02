@@ -9,29 +9,32 @@ import {
   Alert,
   DeviceEventEmitter,
   Image,
+  Dimensions,
 } from 'react-native';
 import { IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VLCPlayer } from 'react-native-vlc-media-player';
+import GuideStreamView, { GuideStreamViewRef } from '../components/GuideStreamView';
 import RNFS from 'react-native-fs';
 import { PALETTES as PalettesConstant } from '../core/constant';
 import { createThumbnail } from 'react-native-create-thumbnail';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 /* =========================================================
    CONFIG
-========================================================= */
+======================================================== */
 
 const API_URL = 'http://192.168.42.1/api/v1/files/customdata';
 
 /* =========================================================
    PALETTES
-========================================================= */
+======================================================== */
 
 const PALETTES = PalettesConstant;
 
 /* =========================================================
    COMMAND PROTOCOL
-========================================================= */
+======================================================== */
 
 const CommandProtocol = {
   FRAME_HEAD: [0x55, 0xaa],
@@ -41,7 +44,7 @@ const CommandProtocol = {
 
 /* =========================================================
    BYTE HELPERS
-========================================================= */
+======================================================== */
 
 function intToByteArray(value: number): number[] {
   return [
@@ -58,7 +61,7 @@ function bytesToHex(bytes: number[]) {
 
 /* =========================================================
    JADX TRANSLATION
-========================================================= */
+======================================================== */
 
 function structSerialPortParam(command: number[], value: number): number[] {
   return [...command, ...intToByteArray(value)];
@@ -132,7 +135,7 @@ async function sendPallet(id: number) {
 
 /* =========================================================
    SCREEN
-========================================================= */
+======================================================== */
 
 const StreamScreen = ({ navigation, isFocused }: any) => {
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
@@ -140,10 +143,9 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
   const [playerKey, setPlayerKey] = useState(1);
   const [isVideoMode, setIsVideoMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const vlcRef = useRef<any>(null);
+  const guideRef = useRef<GuideStreamViewRef>(null);
   const [renderPlayer, setRenderPlayer] = useState(false);
   const [lastMedia, setLastMedia] = useState<string | null>(null);
-  const [currentVideoPath, setCurrentVideoPath] = useState<string | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
 
   useEffect(() => {
@@ -174,14 +176,12 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
 
         const latest = media[0];
 
-        // kalau gambar langsung tampilkan
         if (
           latest.name.endsWith('.png') ||
           latest.name.endsWith('.jpg')
         ) {
           setLastMedia(`file://${latest.path}`);
         } else {
-          // kalau video generate thumbnail
           const thumb = await createThumbnail({
             url: `file://${latest.path}`,
             timeStamp: 1000,
@@ -206,16 +206,13 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
     let interval: number;
 
     if (isRecording) {
-      // Jalankan interval tiap 1 detik (1000ms)
       interval = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } else {
-      // Reset timer kalau rekaman mati
       setRecordingTime(0);
     }
 
-    // Cleanup interval pas komponen unmount atau status berubah
     return () => clearInterval(interval);
   }, [isRecording]);
 
@@ -224,7 +221,6 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
       setRenderPlayer(true);
       setRenderPlayer(!renderPlayer)
     } else {
-      // Jeda 500ms sebelum mematikan player agar transisi navigasi selesai dulu
       const timer = setTimeout(() => {
         setRenderPlayer(false);
         setRenderPlayer(!renderPlayer)
@@ -245,25 +241,21 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
     return `${minutes}:${seconds}`;
   };
 
-  // ===============================
-  // FUNCTION CAPTURE
-  // ===============================
   const handleCapture = async () => {
     try {
       console.log('🔗 Triggering hardware calibration...');
       await fetch('http://192.168.42.1/api/v1/paramline');
 
-      setTimeout(() => {
-        if (vlcRef.current?.snapshot) {
-          const filename = `BullsEye${Date.now()}.png`;
-          const localPath = `${RNFS.DocumentDirectoryPath}/${filename}`;
-          vlcRef.current.snapshot(localPath);
-          console.log('📸 PROSES SIMPAN KE:', localPath);
-        } else {
-          console.log('❌ Error: vlcRef belum ready');
-        }
-      }, 300);
+      const filename = `BullsEye${Date.now()}.png`;
+      const localPath = `${RNFS.DocumentDirectoryPath}/${filename}`;
 
+      await RNFS.downloadFile({
+        fromUrl: 'http://192.168.42.1/screenshot/',
+        toFile: localPath,
+      }).promise;
+
+      console.log('📸 Saved:', localPath);
+      setLastMedia(`file://${localPath}`);
     } catch (e) {
       console.log('❌ Capture Error:', e);
     }
@@ -272,84 +264,31 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
   const handleRecordVideo = async () => {
     try {
       if (isRecording) {
-        // =====================================
-        // STOP RECORD
-        // =====================================
         console.log("⏹️ Stop recording...");
-
-        if (vlcRef.current?.stopRecord) {
-          vlcRef.current.stopRecord();
-        } else if (vlcRef.current?.stopRecording) {
-          vlcRef.current.stopRecording();
-        }
-
+        guideRef.current?.stopRecord();
         setIsRecording(false);
-
-        // Tunggu VLC flush file
-        setTimeout(async () => {
-          try {
-            const files = await RNFS.readDir(RNFS.CachesDirectoryPath);
-
-            console.log(
-              "📂 CACHE FILES:",
-              files.map(f => f.name)
-            );
-
-            // Cari file video terbaru
-            const videos = files.filter(
-              f =>
-                f.name.endsWith(".mp4") ||
-                f.name.endsWith(".ts")
-            );
-
-            videos.sort((a, b) => {
-              const dateA = a.mtime ? new Date(a.mtime).getTime() : 0;
-              const dateB = b.mtime ? new Date(b.mtime).getTime() : 0;
-              return dateB - dateA;
-            });
-
-            if (videos.length > 0) {
-              const latest = videos[0];
-
-              setLastMedia(`file://${latest.path}`);
-              console.log("✅ Video ditemukan:", latest.path);
-
-              Alert.alert("Sukses", "Video berhasil direkam");
-            } else {
-              Alert.alert("Info", "Video belum ditemukan.");
-            }
-          } catch (err) {
-            console.log("❌ Scan file error:", err);
-          }
-        }, 3000); // kasih waktu 3 detik
-
       } else {
-        // =====================================
-        // START RECORD
-        // =====================================
         console.log("⏺️ Start recording...");
-
         await fetch("http://192.168.42.1/api/v1/paramline").catch(() => { });
 
-        const filename = `BullsEye_${Date.now()}.ts`;
-
+        const filename = `BullsEye_${Date.now()}.mp4`;
         const savePath = `${RNFS.CachesDirectoryPath}/${filename}`;
-
         console.log("🎥 Save to:", savePath);
 
-        if (vlcRef.current?.startRecord) {
-          vlcRef.current.startRecord(savePath);
-        } else if (vlcRef.current?.startRecording) {
-          vlcRef.current.startRecording(savePath);
-        }
-
-        setCurrentVideoPath(savePath);
+        guideRef.current?.startRecord(savePath);
         setIsRecording(true);
       }
     } catch (e) {
       console.log("❌ Record error:", e);
       setIsRecording(false);
     }
+  };
+
+  const handleRecordComplete = (event: { nativeEvent: { path: string } }) => {
+    const { path } = event.nativeEvent;
+    console.log("✅ Record complete:", path);
+    setLastMedia(`file://${path}`);
+    Alert.alert("Sukses", "Video berhasil direkam");
   };
 
   return (
@@ -361,38 +300,12 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
       />
 
       {renderPlayer && (
-        <VLCPlayer
-          ref={vlcRef}
+        <GuideStreamView
+          ref={guideRef}
           key={playerKey}
           style={styles.videoStream}
-          videoAspectRatio="16:9"
-          source={{
-            uri: 'rtsp://192.168.42.1:8554/video',
-
-            initOptions: [
-              '--network-caching=150',
-              '--rtsp-caching=150',
-              '--live-caching=150',
-              '--clock-jitter=0',
-              '--clock-synchro=0',
-              '--drop-late-frames',
-              '--skip-frames',
-              '--avcodec-hw=any',
-              '--no-stats',
-              '--no-osd',
-            ]
-          }}
-          autoplay
-          onSnapshot={(event) => {
-            setLastMedia(`file://${event.path}`); // Simpan path buat thumbnail
-            // Alert.alert('Success', 'Photo saved');
-          }}
-          onPlaying={() => console.log('🔥 RTSP STREAM CONNECTED & PLAYING!')}
-          onError={() => {
-            setTimeout(() => {
-              setPlayerKey(v => v + 1);
-            }, 2000);
-          }}
+          rtspType={1}
+          onRecordComplete={handleRecordComplete}
         />
       )}
 
@@ -405,7 +318,6 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
               iconColor="#FFF"
               size={28}
               onPress={() => {
-                // Berikan perintah pindah tab segera
                 navigation.push('Main')
               }}
               rippleColor="rgba(255, 255, 255, 0.2)"
@@ -414,14 +326,12 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
 
           <View style={styles.headerCenter}>
             <View style={[styles.statusBadge, isRecording && { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
-              {/* Dot jadi merah pas ngerekam */}
               <View style={[styles.liveDot, isRecording && { backgroundColor: '#FF3B30' }]} />
               <Text style={[styles.statusText, isRecording && { color: '#FF3B30' }]}>
                 {isRecording ? 'REC' : 'LIVE'}
               </Text>
             </View>
 
-            {/* Timer muncul tepat di bawah badge saat recording */}
             {isRecording && (
               <Text style={styles.timerText}>{formatTime(recordingTime)}</Text>
             )}
@@ -437,12 +347,6 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
           </View>
         </View>
 
-        {/* MIDDLE INFO */}
-        <View style={styles.midInfo}>
-          <Text style={styles.isoText}>ISO 400</Text>
-          <Text style={styles.isoText}>1/60</Text>
-          <Text style={styles.isoText}>F1.8</Text>
-        </View>
 
         {/* BOTTOM SECTION */}
         <View style={styles.bottomSection}>
@@ -572,21 +476,51 @@ const styles = StyleSheet.create({
   },
   videoStream: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 170,
+    aspectRatio: 1,
+
+    width: 500,
+    height: 500,
+
+    alignSelf: 'center',
   },
   overlayContainer: {
     flex: 1,
     justifyContent: 'space-between',
+  },
+  // SCOPE DESIGN
+  scopeOverlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    marginTop: 150,
+  },
+  scopeCircle: {
+    width: SCREEN_WIDTH * 0.7,
+    height: SCREEN_WIDTH * 0.7,
+    borderRadius: (SCREEN_WIDTH * 0.7) / 2,
+    backgroundColor: 'transparent',
+    borderWidth: 1000,
+    borderColor: '#000',
+  },
+  reticleContainer: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 150,
+  },
+  reticleImage: {
+    width: 250,
+    height: 250,
+    opacity: 0.9,
   },
   floatingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 10,
-    marginTop: 10,
+    marginTop: 20,
   },
   headerLeft: { width: 50 },
   headerRight: { width: 50, alignItems: 'flex-end' },
@@ -615,15 +549,52 @@ const styles = StyleSheet.create({
   },
   midInfo: {
     position: 'absolute',
-    top: '20%',
-    right: 20,
-    alignItems: 'flex-end',
+    top: '75%', // Lowered to match new scope position
+    width: '100%',
+    alignItems: 'center',
+  },
+  infoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  infoDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 12,
   },
   isoText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 10,
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  statusIndicatorsContainer: {
+    position: 'absolute',
+    top: '92%', // Lowered to match new scope position
+    width: '100%',
+    alignItems: 'center',
+  },
+  indicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniIcon: {
+    margin: 0,
+    padding: 0,
+    width: 24,
+  },
+  indicatorText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '600',
+    marginHorizontal: 4,
   },
   bottomSection: {
     paddingBottom: 30,
@@ -692,11 +663,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
     padding: 2,
   },
-  galleryInner: {
-    flex: 1,
-    borderRadius: 6,
-    backgroundColor: '#333',
-  },
   shutterOuter: {
     width: 70,
     height: 70,
@@ -714,4 +680,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
 });
-

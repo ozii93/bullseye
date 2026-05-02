@@ -102,9 +102,9 @@ const ProfileScreen = () => {
           />
           <Divider style={styles.divider} />
           <ProfileItem
-            title="ENCRYPTED DEVICES"
-            icon="router-wireless-settings"
-            onPress={openWifiSettings}
+            title="DEVICE HISTORY"
+            icon="history"
+            onPress={() => navigation.navigate('DeviceHistory')}
           />
         </Surface>
 

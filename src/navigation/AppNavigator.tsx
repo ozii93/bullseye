@@ -15,6 +15,7 @@ import QuickUserGuideScreen from '../screens/QuickUserGuideScreen'
 import PDFViewerScreen from '../screens/PDFViewerScreen'
 import FAQScreen from '../screens/FAQScreen'
 import AboutScreen from '../screens/AboutScreen'
+import DeviceHistoryScreen from '../screens/DeviceHistoryScreen'
 
 type MainStackParamList = {
   Login: undefined
@@ -28,6 +29,7 @@ type MainStackParamList = {
   PDFViewer: { source: any, title: string }
   FAQ: undefined
   About: undefined
+  DeviceHistory: undefined
 }
 
 const MainStack = createNativeStackNavigator<MainStackParamList>()
@@ -110,6 +112,7 @@ const AppNavigator = memo(
               <MainStack.Screen name={'PDFViewer'} component={PDFViewerScreen} />
               <MainStack.Screen name={'FAQ'} component={FAQScreen} />
               <MainStack.Screen name={'About'} component={AboutScreen} />
+              <MainStack.Screen name={'DeviceHistory'} component={DeviceHistoryScreen} />
             </>
           ) : (
             <MainStack.Screen name="Login" component={LoginScreen} />

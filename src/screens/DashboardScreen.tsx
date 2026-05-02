@@ -1,60 +1,101 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
-  DeviceEventEmitter, 
-  Linking, 
+import React, { useEffect, useState, useRef } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  DeviceEventEmitter,
+  Linking,
   Platform,
   Dimensions,
   StatusBar
 } from 'react-native';
-import { Text, Surface, Avatar, Button } from 'react-native-paper';
+import { Text, Surface, Avatar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../provider/AuthContext';
 
 const { width } = Dimensions.get('window');
 
-const DashboardScreen = ({ navigation, isFocused }: any) => {
+const DashboardScreen = ({ navigation }: any) => {
+  const isFocused = useIsFocused();
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
-  const [deviceName, setDeviceName] = useState('BullsEye Thermal Device');
+  const [deviceName, setDeviceName] = useState('BullsEye Device');
+
+  // Load last connected device on mount
+  useEffect(() => {
+    const loadLastDevice = async () => {
+      try {
+        const savedName = await AsyncStorage.getItem('lastConnectedDevice');
+        if (savedName) {
+          setDeviceName(savedName);
+        }
+      } catch (error) {
+        console.error('Error loading last device:', error);
+      }
+    };
+    loadLastDevice();
+  }, []);
+
+  const checkConnection = async () => {
+    const endpoints = [
+      'http://192.168.42.1/api/v1/system/deviceinfo',
+      'http://192.168.42.1/api/v1/paramline'
+    ];
+
+    let success = false;
+
+    for (const url of endpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        const response = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          if (url.includes('deviceinfo')) {
+            const data = await response.json();
+            const name = data.deviceName || data.model || data.hostname || 'BullsEye Device';
+            setDeviceName(name);
+            await AsyncStorage.setItem('lastConnectedDevice', name);
+          }
+          success = true;
+          break;
+        }
+      } catch (error) {
+        // Fail fast
+      }
+    }
+
+    setIsConnected(success);
+    return success;
+  };
 
   useEffect(() => {
     if (!isFocused) return;
 
-    const checkConnection = async () => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        
-        const response = await fetch('http://192.168.42.1/api/v1/system/deviceinfo', {
-          method: 'GET',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const data = await response.json();
-          const name = data.deviceName || data.model || data.hostname || 'BullsEye Device';
-          setDeviceName(name);
-          setIsConnected(true);
-        } else {
-          setIsConnected(true);
-        }
-      } catch (error) {
-        setIsConnected(false);
-      }
-    };
-
     checkConnection();
-    const interval = setInterval(checkConnection, 5000);
+    const interval = setInterval(checkConnection, 1500); // 1.5 seconds for snappy updates
     return () => clearInterval(interval);
   }, [isFocused]);
+
+  const handleActionPress = () => {
+    if (isConnected) {
+      navigation.navigate('Stream');
+    } else {
+      openWifiSettings();
+    }
+  };
 
   const openWifiSettings = () => {
     if (Platform.OS === 'android') {
@@ -68,7 +109,7 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         {/* Header Section */}
         <View style={styles.header}>
           <View>
@@ -76,77 +117,65 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
             <Text style={styles.userName}>{user?.name?.toUpperCase() || 'COMMANDER HAWK'}</Text>
           </View>
           <View style={styles.avatarFrame}>
-            <Avatar.Image 
-              size={54} 
-              source={{ uri: user?.photo || 'https://i.pravatar.cc/150?u=hawk' }} 
+            <Avatar.Image
+              size={54}
+              source={{ uri: user?.photo || 'https://i.pravatar.cc/150?u=hawk' }}
             />
           </View>
         </View>
 
-        {/* System Status Display */}
-        <Surface style={styles.statusPanel} elevation={2}>
-          <View style={styles.panelHeader}>
-            <MaterialDesignIcons name="shield-sync" size={16} color="#D32F2F" />
-            <Text style={styles.panelTitle}>SYSTEM CONNECTIVITY</Text>
-            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4CAF50' : '#D32F2F' }]} />
-          </View>
-          
-          <View style={styles.statusMain}>
-            <View style={styles.deviceInfo}>
-              <Text style={styles.deviceName}>{deviceName.toUpperCase()}</Text>
-              <Text style={[styles.statusStatus, { color: isConnected ? '#4CAF50' : '#D32F2F' }]}>
-                {isConnected ? 'SIGNAL ACQUIRED' : 'SIGNAL LOST'}
-              </Text>
+        {/* Device Status Card - Redesigned to match screenshot */}
+        <Surface style={styles.deviceCard} elevation={4}>
+          <View style={styles.deviceCardTop}>
+            <View style={styles.deviceImageWrapper}>
+              {/* Fallback icon for device image */}
+              <MaterialDesignIcons name="telescope" size={48} color="rgba(255,255,255,0.5)" />
             </View>
-            <TouchableOpacity onPress={openWifiSettings} style={styles.linkButton}>
-              <MaterialDesignIcons 
-                name={isConnected ? "wifi-check" : "wifi-alert"} 
-                size={32} 
-                color={isConnected ? '#4CAF50' : '#D32F2F'} 
-              />
+
+            <View style={styles.deviceDetails}>
+              <Text style={styles.deviceCategory}>Infrared Camera</Text>
+              <View style={styles.connectionStatusRow}>
+                <View style={styles.wifiIconCircle}>
+                  <MaterialDesignIcons
+                    name="wifi"
+                    size={14}
+                    color={isConnected ? '#2196F3' : 'rgba(255,255,255,0.3)'}
+                  />
+                </View>
+                <Text style={styles.deviceNameText}>
+                  {deviceName}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.chevronButton}
+              onPress={handleActionPress}
+            >
+              <MaterialDesignIcons name="chevron-right" size={28} color="rgba(255,255,255,0.7)" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.panelFooter}>
-            <View style={styles.footerLine} />
-            <Text style={styles.footerText}>ENCRYPTED CHANNEL 09-B</Text>
-            <View style={styles.footerLine} />
+          <View style={styles.deviceCardActionArea}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleActionPress}
+              style={[
+                styles.mainActionButton,
+                isConnected ? styles.observationActive : styles.reconnectMode
+              ]}
+            >
+              {isConnected ? (
+                <>
+                  <MaterialDesignIcons name="target" size={24} color="#FFF" />
+                  <Text style={styles.mainActionButtonText}>Observation 2</Text>
+                </>
+              ) : (
+                <Text style={styles.mainActionButtonText}>Reconnect</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </Surface>
-
-        {/* Primary Monitor Section */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.accentLine} />
-          <Text style={styles.sectionTitle}>PRIMARY MONITOR</Text>
-        </View>
-
-        <TouchableOpacity 
-          activeOpacity={0.9}
-          onPress={() => navigation.navigate('Stream')}
-          style={styles.monitorContainer}
-        >
-          <Surface style={styles.monitorFrame} elevation={4}>
-            <View style={styles.cornerTL} />
-            <View style={styles.cornerTR} />
-            <View style={styles.cornerBL} />
-            <View style={styles.cornerBR} />
-            
-            <View style={styles.monitorContent}>
-              <MaterialDesignIcons name="access-point" size={40} color="rgba(255,255,255,0.2)" />
-              <View style={styles.tapBadge}>
-                <Text style={styles.tapText}>INITIALIZE LIVE STREAM</Text>
-              </View>
-            </View>
-
-            <View style={styles.monitorOverlay}>
-              <View style={styles.recBadge}>
-                <View style={styles.recDot} />
-                <Text style={styles.recText}>LIVE FEED</Text>
-              </View>
-              <Text style={styles.monitorTime}>00:00:00:00</Text>
-            </View>
-          </Surface>
-        </TouchableOpacity>
 
         {/* Quick Actions Grid */}
         <View style={styles.sectionHeader}>
@@ -159,8 +188,8 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
             { id: 1, label: 'RECORDINGS', icon: 'video-vintage', color: '#FF9800' },
             { id: 2, label: 'GALLERY', icon: 'view-grid-outline', color: '#00E5FF' },
           ].map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
+            <TouchableOpacity
+              key={item.id}
               style={styles.gridItem}
               onPress={() => {
                 if (item.label === 'GALLERY') {
@@ -186,103 +215,112 @@ const DashboardScreen = ({ navigation, isFocused }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#05070a',
+    backgroundColor: '#0A0A0A',
   },
   scrollContent: {
-    padding: 24,
-    paddingBottom: 120,
+    padding: 20,
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
+    marginTop: 10,
   },
   welcomeText: {
     fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 2.5,
     color: 'rgba(255,255,255,0.4)',
     marginBottom: 4,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: '#FFF',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   avatarFrame: {
-    padding: 4,
-    borderWidth: 1,
+    padding: 3,
+    borderWidth: 1.5,
     borderColor: '#00E5FF',
-    borderRadius: 32,
+    borderRadius: 30,
   },
-  statusPanel: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+  deviceCard: {
+    backgroundColor: '#1A1A1A',
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.05)',
     marginBottom: 40,
   },
-  panelHeader: {
+  deviceCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  panelTitle: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    marginLeft: 10,
-    flex: 1,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 5,
-  },
-  statusMain: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  deviceImageWrapper: {
+    width: 90,
+    height: 70,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginRight: 16,
   },
-  deviceInfo: {
+  deviceDetails: {
     flex: 1,
   },
-  deviceName: {
+  deviceCategory: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFF',
-    letterSpacing: 1,
+    marginBottom: 6,
   },
-  statusStatus: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 4,
-    letterSpacing: 1,
-  },
-  panelFooter: {
+  connectionStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  footerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  wifiIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
-  footerText: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 8,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    marginHorizontal: 15,
+  deviceNameText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '500',
+  },
+  chevronButton: {
+    padding: 4,
+  },
+  deviceCardActionArea: {
+    marginTop: 4,
+  },
+  mainActionButton: {
+    flexDirection: 'row',
+    height: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  observationActive: {
+    backgroundColor: '#007AFF',
+  },
+  reconnectMode: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  mainActionButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -296,82 +334,10 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#FFF',
     letterSpacing: 2,
-  },
-  monitorContainer: {
-    width: '100%',
-    height: 220,
-    marginBottom: 40,
-  },
-  monitorFrame: {
-    flex: 1,
-    backgroundColor: '#0c1018',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    padding: 2,
-    overflow: 'hidden',
-  },
-  cornerTL: { position: 'absolute', top: 15, left: 15, width: 20, height: 20, borderTopWidth: 1, borderLeftWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
-  cornerTR: { position: 'absolute', top: 15, right: 15, width: 20, height: 20, borderTopWidth: 1, borderRightWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
-  cornerBL: { position: 'absolute', bottom: 15, left: 15, width: 20, height: 20, borderBottomWidth: 1, borderLeftWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
-  cornerBR: { position: 'absolute', bottom: 15, right: 15, width: 20, height: 20, borderBottomWidth: 1, borderRightWidth: 1, borderColor: 'rgba(211, 47, 47, 0.4)' },
-  monitorContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tapBadge: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  tapText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-  },
-  monitorOverlay: {
-    position: 'absolute',
-    top: 25,
-    left: 25,
-    right: 25,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(211, 47, 47, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  recDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#D32F2F',
-    marginRight: 6,
-  },
-  recText: {
-    color: '#D32F2F',
-    fontSize: 9,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  monitorTime: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 10,
-    fontFamily: 'monospace',
   },
   grid: {
     flexDirection: 'row',
@@ -381,7 +347,7 @@ const styles = StyleSheet.create({
     width: '48%',
   },
   gridSurface: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
@@ -389,22 +355,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.06)',
   },
   iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   gridLabel: {
     color: '#FFF',
-    fontWeight: '900',
-    fontSize: 11,
+    fontWeight: '800',
+    fontSize: 10,
     letterSpacing: 1.5,
-  },
-  linkButton: {
-    padding: 10,
   }
 });
 
 export default DashboardScreen;
+
