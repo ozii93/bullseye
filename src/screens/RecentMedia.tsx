@@ -41,10 +41,13 @@ const RecentMedia = ({ route, navigation }: any) => {
 
   const loadAllMedia = async (): Promise<void> => {
     try {
-      const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath);
-      const cacheFiles = await RNFS.readDir(RNFS.CachesDirectoryPath);
+      const bullsEyePath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
+      
+      const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath).catch(() => []);
+      const cacheFiles = await RNFS.readDir(RNFS.CachesDirectoryPath).catch(() => []);
+      const externalFiles = await RNFS.readDir(bullsEyePath).catch(() => []);
 
-      const allFiles = [...docFiles, ...cacheFiles];
+      const allFiles = [...docFiles, ...cacheFiles, ...externalFiles];
 
       const filtered = allFiles.filter((file) => {
         const name = file.name.toLowerCase();

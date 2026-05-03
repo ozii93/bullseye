@@ -25,9 +25,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const RETICLE_TYPES = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Type ${i + 1}` }));
 
 const RETICLE_COLORS = [
-  { id: 0, name: 'Green', color: '#00FF00' },
-  { id: 1, name: 'Black', color: '#000000' },
-  { id: 2, name: 'White', color: '#FFFFFF' },
+  { id: 0, name: 'Black', color: '#000000' },
+  { id: 1, name: 'White', color: '#FFFFFF' },
+  { id: 2, name: 'Green', color: '#00FF00' },
   { id: 3, name: 'Red', color: '#FF0000' },
 ];
 
@@ -59,7 +59,9 @@ async function setHardwareReticleType(index: number) {
 }
 
 async function setHardwareReticleColor(index: number) {
-  await sendReticleCommand('dashcolor', String(index));
+  const colorNames = ['black', 'white', 'green', 'red'];
+  const colorName = colorNames[index] || 'green';
+  await sendReticleCommand('dashcolor', colorName);
 }
 
 async function setHardwareReticleBrightness(value: number) {
@@ -486,10 +488,13 @@ const StreamScreen = ({ navigation }: any) => {
     console.log('📂 STORAGE PATH:', RNFS.DocumentDirectoryPath);
     const loadLatestThumbnail = async () => {
       try {
-        const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath);
-        const cacheFiles = await RNFS.readDir(RNFS.CachesDirectoryPath);
+        const bullsEyePath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
 
-        const files = [...docFiles, ...cacheFiles];
+        const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath).catch(() => []);
+        const cacheFiles = await RNFS.readDir(RNFS.CachesDirectoryPath).catch(() => []);
+        const externalFiles = await RNFS.readDir(bullsEyePath).catch(() => []);
+
+        const files = [...docFiles, ...cacheFiles, ...externalFiles];
 
         const media = files.filter(f =>
           f.name.endsWith('.png') ||
@@ -582,35 +587,24 @@ const StreamScreen = ({ navigation }: any) => {
     try {
       console.log('📸 Taking Tactical Snapshot...');
       const filename = `BullsEye_${Date.now()}.png`;
-      const localPath = `${RNFS.DocumentDirectoryPath}/${filename}`;
+      const dirPath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
+      await RNFS.mkdir(dirPath);
+      const localPath = `${dirPath}/${filename}`;
 
-      // 1. Immediate UI update (Tactical Feedback)
-      setLastMedia(`file://${localPath}`);
-
-      // 2. Trigger native snapshot
+      // 1. Trigger native snapshot (fire-and-forget, native writes to path)
       guideRef.current?.snapShot(localPath);
 
-      // 3. Verification loop for Disk I/O
-      setTimeout(async () => {
-        const exists = await RNFS.exists(localPath);
-        if (exists) {
-          console.log('✅ Snapshot Secure:', localPath);
-          Alert.alert("Sukses", `Foto berhasil disimpan`);
-        } else {
-          // Final retry logic for slow devices
-          setTimeout(async () => {
-            if (await RNFS.exists(localPath)) {
-              Alert.alert("Sukses", `Foto berhasil disimpan`);
-            } else {
-              Alert.alert("GAGAL", "Gagal menyimpan foto ke penyimpanan internal.");
-            }
-          }, 500);
-        }
-      }, 1500);
+      // 2. Wait for native to finish writing + update thumbnail
+      await new Promise<void>(resolve => setTimeout(resolve, 1000));
 
+      // 3. Update UI with cache-busting URI to force Image reload
+      const displayUri = `file://${localPath}?t=${Date.now()}`;
+      setLastMedia(displayUri);
+      console.log('✅ Snapshot Secure:', localPath);
+      Alert.alert('Sukses', 'Foto berhasil disimpan');
     } catch (e: any) {
       console.log('❌ Capture Error:', e);
-      Alert.alert("CAPTURE FAILED", "Gagal mengeksekusi pengambilan foto.");
+      Alert.alert('CAPTURE FAILED', 'Gagal mengeksekusi pengambilan foto.');
     }
   };
 
@@ -625,7 +619,9 @@ const StreamScreen = ({ navigation }: any) => {
         await fetch("http://192.168.42.1/api/v1/paramline").catch(() => { });
 
         const filename = `BullsEye_${Date.now()}.mp4`;
-        const savePath = `${RNFS.DocumentDirectoryPath}/${filename}`;
+        const dirPath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
+        await RNFS.mkdir(dirPath);
+        const savePath = `${dirPath}/${filename}`;
         console.log("🎥 Save to:", savePath);
 
         guideRef.current?.startRecord(savePath);
@@ -641,7 +637,7 @@ const StreamScreen = ({ navigation }: any) => {
     const { path } = event.nativeEvent;
     console.log("✅ Record complete:", path);
     setLastMedia(`file://${path}`);
-    Alert.alert("Sukses", `Video berhasil direkam di: ${path}`);
+    Alert.alert("Sukses", `Video berhasil disimpan`);
   };
 
   const handleOpenZeroCalibration = async () => {
