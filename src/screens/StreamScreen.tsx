@@ -67,6 +67,184 @@ async function setHardwareReticleBrightness(value: number) {
 
 
 /* =========================================================
+   ZERO CALIBRATION HELPERS
+======================================================== */
+
+const ZC_BASE = 'http://192.168.42.1/api/v1/peripheral';
+
+async function startZeroCalibration(distance: number): Promise<boolean> {
+  const url = `${ZC_BASE}/start_zero_calibration`;
+  const payload = JSON.stringify({ value: String(distance) });
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ start_zero_calibration (distance=${distance}) status=${response.status}:`, result);
+    return response.ok;
+  } catch (error) {
+    console.error('❌ Gagal start_zero_calibration:', error);
+    return false;
+  }
+}
+
+async function startCustomZeroCalibration(distance: string): Promise<boolean> {
+  const url = `${ZC_BASE}/custom_zero_calibration`;
+  const payload = JSON.stringify({ value: distance });
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ custom_zero_calibration (value=${distance}) status=${response.status}:`, result);
+    return response.ok;
+  } catch (error) {
+    console.error('❌ Gagal custom_zero_calibration:', error);
+    return false;
+  }
+}
+
+async function getCustomZeroCalibration(): Promise<{ distance: number; index: number }[]> {
+  const url = `${ZC_BASE}/custom_zero_calibration`;
+  try {
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) {
+      console.warn(`⚠️ GET custom_zero_calibration returned ${response.status}`);
+      return [];
+    }
+    const text = await response.text();
+    if (!text) return [];
+    const data = JSON.parse(text);
+    console.log('✅ Custom zero calibration config:', data);
+    return (data.value || []) as { distance: number; index: number }[];
+  } catch (error) {
+    console.warn('⚠️ Could not GET custom zero calibration, will use custom mode with defaults:', error);
+    return [];
+  }
+}
+
+async function setZeroCalibrationFreeze(on: boolean) {
+  const url = `${ZC_BASE}/zero_calibration_freeze`;
+  const payload = JSON.stringify({ value: on ? 'on' : 'off' });
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ Freeze ${on ? 'ON' : 'OFF'}:`, result);
+  } catch (error) {
+    console.error('❌ Gagal set freeze:', error);
+  }
+}
+
+async function setZeroCalibrationCoord(x: number, y: number) {
+  const url = `${ZC_BASE}/zero_calibration_coord`;
+  const payload = JSON.stringify({
+    value: {
+      x: String(x),
+      y: String(y),
+    },
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`🎯 Coord set to X:${x} Y:${y}:`, result);
+  } catch (error) {
+    console.error('❌ Gagal set coord:', error);
+  }
+}
+
+async function fetchCurrentCalibrationData() {
+  try {
+    // Correct URL is /api/v1/paramline, NOT under /peripheral/
+    const response = await fetch('http://192.168.42.1/api/v1/paramline');
+    const buffer = await response.arrayBuffer();
+    const data = new Uint8Array(buffer);
+
+    // Validate header (0xAA 0x55)
+    if (data[0] === 0xAA && data[1] === 0x55) {
+      const view = new DataView(buffer);
+      // X: Index 133, Y: Index 135 (Little Endian 16-bit signed)
+      const currentX = view.getInt16(133, true);
+      const currentY = view.getInt16(135, true);
+      const currentDist = view.getUint16(130, true);
+      const isFrozen = data[132] !== 0;
+
+      console.log(`📡 Hardware Paramline Sync -> X: ${currentX}, Y: ${currentY}, Dist: ${currentDist}`);
+      return { x: currentX, y: currentY, distance: currentDist, isFrozen };
+    }
+    return null;
+  } catch (e) {
+    console.warn('⚠️ Could not fetch paramline:', e);
+    return null;
+  }
+}
+
+async function saveZeroCalibration() {
+  const url = `${ZC_BASE}/save_zero_calibration`;
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}), // HttpManager.java sends an empty map {}
+    });
+    const result = await response.text();
+    console.log('✅ Zero calibration saved:', result);
+  } catch (error) {
+    console.error('❌ Gagal save zero calibration:', error);
+  }
+}
+
+async function zeroCalibrationZoom(value: number) {
+  const url = 'http://192.168.42.1/api/v1/camera/zero_calibration_zoom';
+  const payload = JSON.stringify({ value: String(value) });
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ Zoom ${value === 1 ? 'IN' : 'OUT'}:`, result);
+  } catch (error) {
+    console.error('❌ Gagal zoom:', error);
+  }
+}
+
+async function getZeroCalibrationCoord(): Promise<{ x: number; y: number } | null> {
+  const url = `${ZC_BASE}/zero_calibration_coord`;
+  try {
+    const response = await fetch(url, { method: 'GET' });
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Current coordinates:', data);
+      // Assuming response format is { value: { x: "0", y: "0" } }
+      if (data.value) {
+        return {
+          x: parseInt(data.value.x) || 0,
+          y: parseInt(data.value.y) || 0
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.log('⚠️ Could not fetch current coords (endpoint might not support GET):', error);
+    return null;
+  }
+}
+
+/* =========================================================
    CONFIG
 ======================================================== */
 
@@ -198,6 +376,17 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
   const [reticleBrightness, setReticleBrightness] = useState(5);
   const [reticleType, setReticleType] = useState(1);
   const [reticleColor, setReticleColor] = useState(0);
+
+  // Zero Calibration state
+  const [isZeroCalibrationVisible, setIsZeroCalibrationVisible] = useState(false);
+  const [zeroCalDistances, setZeroCalDistances] = useState<{ distance: number; index: number }[]>([]);
+  const [selectedDistance, setSelectedDistance] = useState<number | null>(null);
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [coordX, setCoordX] = useState(0);
+  const [coordY, setCoordY] = useState(0);
+  const [zeroCalZoom, setZeroCalZoom] = useState(1);
+  const [isLoadingDistances, setIsLoadingDistances] = useState(false);
+  const [isCustomZeroCal, setIsCustomZeroCal] = useState(false);
 
   useEffect(() => {
     const loadLatestThumbnail = async () => {
@@ -340,6 +529,132 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
     console.log("✅ Record complete:", path);
     setLastMedia(`file://${path}`);
     Alert.alert("Sukses", "Video berhasil direkam");
+  };
+
+  const handleOpenZeroCalibration = async () => {
+    setIsZeroCalibrationVisible(true);
+    setIsLoadingDistances(true);
+
+    // Step 1: try to fetch distance list from device (GET custom_zero_calibration)
+    const dists = await getCustomZeroCalibration();
+    const isCustom = dists.length > 0;
+    setIsCustomZeroCal(isCustom);
+
+    if (isCustom) {
+      setZeroCalDistances(dists);
+      // Custom mode: value is the INDEX from device, not the distance!
+      setSelectedDistance(dists[0].index);
+      console.log('🔧 Mode: CUSTOM — sending index', dists[0].index, '(distance', dists[0].distance, ')');
+    } else {
+      setZeroCalDistances([
+        { distance: 50, index: 0 }, { distance: 100, index: 1 },
+        { distance: 200, index: 2 }, { distance: 300, index: 3 },
+        { distance: 500, index: 4 }, { distance: 1000, index: 5 },
+      ]);
+      // Non-custom mode: value is the DISTANCE itself
+      setSelectedDistance(100);
+      console.log('🔧 Mode: STANDARD — sending distance 100');
+    }
+
+    // Sync current X/Y coordinates from device paramline
+    const hwData = await fetchCurrentCalibrationData();
+    if (hwData) {
+      setCoordX(hwData.x);
+      setCoordY(hwData.y);
+      setIsFrozen(hwData.isFrozen);
+    } else {
+      setCoordX(0);
+      setCoordY(0);
+    }
+
+    // Step 2: send command to device
+    if (isCustom) {
+      // Custom mode: send INDEX, not distance!
+      await startCustomZeroCalibration(String(dists[0].index));
+    } else {
+      // GET failed — try CUSTOM first, then STANDARD
+      const customOk = await startCustomZeroCalibration('0');
+      if (customOk) {
+        setIsCustomZeroCal(true);
+        setSelectedDistance(0);
+        console.log('🔧 Device supports CUSTOM mode');
+      } else {
+        console.log('🔧 CUSTOM failed — trying STANDARD...');
+        const standardOk = await startZeroCalibration(100);
+        if (standardOk) {
+          setIsCustomZeroCal(false);
+          setSelectedDistance(100);
+          console.log('🔧 Device supports STANDARD mode');
+        } else {
+          console.error('❌ Both endpoints failed!');
+        }
+      }
+    }
+
+    setIsLoadingDistances(false);
+  };
+
+  const handleCloseZeroCalibration = async () => {
+    if (isCustomZeroCal) { await startCustomZeroCalibration('off'); }
+    else { await startZeroCalibration(0); }
+    await setZeroCalibrationFreeze(false);
+    setIsZeroCalibrationVisible(false);
+    setIsFrozen(false);
+  };
+
+  const handleZeroCalDistanceSelect = async (dist: number, index: number) => {
+    if (isCustomZeroCal) {
+      setSelectedDistance(index);
+      await startCustomZeroCalibration(String(index));
+    } else {
+      setSelectedDistance(dist);
+      await startZeroCalibration(dist);
+    }
+    // Wait a moment then re-fetch — device needs time to update after distance change
+    await new Promise(r => setTimeout(r, 300));
+    const hwData = await fetchCurrentCalibrationData();
+    if (hwData) {
+      setCoordX(hwData.x);
+      setCoordY(hwData.y);
+      setIsFrozen(hwData.isFrozen);
+    }
+  };
+
+  const handleFreezeToggle = async () => {
+    const newState = !isFrozen;
+    setIsFrozen(newState);
+    await setZeroCalibrationFreeze(newState);
+  };
+
+  const handleCoordAdjust = async (dx: number, dy: number) => {
+    // Standard ZG38 logic: Y axis is often reversed in hardware calibration
+    const IS_Y_REVERSED = true;
+    const actualDy = IS_Y_REVERSED ? -dy : dy;
+
+    const newX = coordX + dx;
+    const newY = coordY + actualDy;
+    setCoordX(newX);
+    setCoordY(newY);
+    await setZeroCalibrationCoord(newX, newY);
+  };
+
+  const handleZeroCalZoom = async (direction: number) => {
+    const newZoom = direction === 1 ? zeroCalZoom + 1 : Math.max(1, zeroCalZoom - 1);
+    setZeroCalZoom(newZoom);
+    await zeroCalibrationZoom(direction);
+  };
+
+  const handleSaveZeroCalibration = async () => {
+    await saveZeroCalibration();
+    // After saving, explicitly exit calibration mode to close device OSD
+    if (isCustomZeroCal) {
+      await startCustomZeroCalibration('off');
+    } else {
+      await startZeroCalibration(0);
+    }
+    setIsZeroCalibrationVisible(false);
+    setIsFrozen(false);
+    Alert.alert('Sukses', 'Zero calibration berhasil disimpan');
   };
 
   return (
@@ -549,6 +864,140 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
             </View>
           )}
 
+          {isZeroCalibrationVisible && (
+            <View style={styles.zeroCalWrapper}>
+              <View style={styles.zeroCalHeader}>
+                <Text style={styles.zeroCalTitle}>Zero Calibration</Text>
+                <TouchableOpacity onPress={handleCloseZeroCalibration} style={styles.zeroCalBackBtn}>
+                  <Text style={styles.zeroCalBackText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {isLoadingDistances ? (
+                <Text style={styles.zeroCalLabel}>Loading distances...</Text>
+              ) : (
+                <>
+                  {/* DISTANCE SELECTOR */}
+                  <Text style={styles.zeroCalLabel}>Distance (M)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.typeRow}>
+                      {zeroCalDistances.map((item) => {
+                        const isActive = isCustomZeroCal
+                          ? selectedDistance === item.index
+                          : selectedDistance === item.distance;
+                        return (
+                        <TouchableOpacity
+                          key={item.index}
+                          style={[
+                            styles.typePill,
+                            isActive && styles.activeTypePill,
+                          ]}
+                          onPress={() => handleZeroCalDistanceSelect(item.distance, item.index)}
+                        >
+                          <Text
+                            style={[
+                              styles.typeText,
+                              isActive && styles.activeTypeText,
+                            ]}
+                          >
+                            {item.distance}
+                          </Text>
+                        </TouchableOpacity>
+                      )})}
+                    </View>
+                  </ScrollView>
+
+                  {/* ZOOM */}
+                  <Text style={styles.zeroCalLabel}>Zoom: {zeroCalZoom}x</Text>
+                  <View style={styles.zoomRow}>
+                    <TouchableOpacity
+                      style={styles.zoomBtn}
+                      onPress={() => handleZeroCalZoom(0)}
+                    >
+                      <Text style={styles.zoomBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <View style={styles.zoomValue}>
+                      <Text style={styles.zoomValueText}>{zeroCalZoom}x</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.zoomBtn}
+                      onPress={() => handleZeroCalZoom(1)}
+                    >
+                      <Text style={styles.zoomBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* FREEZE */}
+                  <Text style={styles.zeroCalLabel}>Freeze</Text>
+                  <View style={styles.typeRow}>
+                    <TouchableOpacity
+                      style={[styles.typePill, !isFrozen && styles.activeTypePill]}
+                      onPress={() => isFrozen && handleFreezeToggle()}
+                    >
+                      <Text style={[styles.typeText, !isFrozen && styles.activeTypeText]}>Live</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.typePill, isFrozen && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' }]}
+                      onPress={() => !isFrozen && handleFreezeToggle()}
+                    >
+                      <Text style={[styles.typeText, isFrozen && styles.activeTypeText]}>Frozen</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* COORDINATE D-PAD */}
+                  <Text style={styles.zeroCalLabel}>
+                    Coordinate: X={coordX} Y={coordY}
+                  </Text>
+                  <View style={styles.dpadContainer}>
+                    <View style={styles.dpadRow}>
+                      <TouchableOpacity
+                        style={styles.dpadBtn}
+                        onPress={() => handleCoordAdjust(0, -1)}
+                      >
+                        <Text style={styles.dpadBtnText}>▲</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.dpadRow}>
+                      <TouchableOpacity
+                        style={styles.dpadBtn}
+                        onPress={() => handleCoordAdjust(-1, 0)}
+                      >
+                        <Text style={styles.dpadBtnText}>◀</Text>
+                      </TouchableOpacity>
+                      <View style={styles.dpadCenter}>
+                        <Text style={styles.dpadCenterText}>●</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.dpadBtn}
+                        onPress={() => handleCoordAdjust(1, 0)}
+                      >
+                        <Text style={styles.dpadBtnText}>▶</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.dpadRow}>
+                      <TouchableOpacity
+                        style={styles.dpadBtn}
+                        onPress={() => handleCoordAdjust(0, 1)}
+                      >
+                        <Text style={styles.dpadBtnText}>▼</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* ACTIONS */}
+                  <View style={styles.zeroCalActionContainer}>
+                    <TouchableOpacity style={styles.zeroCalCancelBtn} onPress={handleCloseZeroCalibration}>
+                      <Text style={styles.zeroCalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.zeroCalConfirmBtn} onPress={handleSaveZeroCalibration}>
+                      <Text style={styles.zeroCalConfirmText}>Confirm</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+
           <View style={styles.bottomDock}>
             <View style={styles.dockItem}>
               <TouchableOpacity
@@ -592,7 +1041,18 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
             </View>
 
             <View style={styles.dockItem}>
-              {/* Empty space where reticle was */}
+              <IconButton
+                icon="target"
+                iconColor={isZeroCalibrationVisible ? '#FF9800' : '#FFF'}
+                size={30}
+                onPress={() => {
+                  if (isZeroCalibrationVisible) {
+                    handleCloseZeroCalibration();
+                  } else {
+                    handleOpenZeroCalibration();
+                  }
+                }}
+              />
             </View>
 
             <View style={styles.dockItem}>
@@ -677,11 +1137,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   headerLeft: { width: 50 },
-  headerRight: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-end',
-    width: 100 
+    width: 100
   },
   statusBadge: {
     flexDirection: 'row',
@@ -925,5 +1385,159 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     marginRight: 8,
+  },
+  zeroCalWrapper: {
+    width: '94%',
+    backgroundColor: 'rgba(20,20,20,0.92)',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,152,0,0.15)',
+  },
+  zeroCalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  zeroCalTitle: {
+    color: '#FF9800',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  zeroCalBackBtn: {
+    padding: 4,
+  },
+  zeroCalBackText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  zeroCalLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  zoomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  zoomBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  zoomBtnText: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  zoomValue: {
+    paddingHorizontal: 24,
+  },
+  zoomValueText: {
+    color: '#FF9800',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  dpadContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dpadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dpadBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  dpadBtnText: {
+    color: '#FFF',
+    fontSize: 20,
+  },
+  dpadCenter: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 4,
+  },
+  dpadCenterText: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 12,
+  },
+  zeroCalSaveBtn: {
+    backgroundColor: 'rgba(255,152,0,0.15)',
+    borderWidth: 1,
+    borderColor: '#FF9800',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  zeroCalSaveText: {
+    color: '#FF9800',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+  },
+  zeroCalActionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  zeroCalCancelBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  zeroCalCancelText: {
+    color: '#AAA',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  zeroCalConfirmBtn: {
+    flex: 1,
+    backgroundColor: '#FF9800',
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zeroCalConfirmText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
