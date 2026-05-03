@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import {
   View,
   StyleSheet,
@@ -20,7 +20,8 @@ import { useAuth } from '../provider/AuthContext';
 
 const { width } = Dimensions.get('window');
 
-const DashboardScreen = ({ navigation }: any) => {
+const DashboardScreen = () => {
+  const navigation = useNavigation<any>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
@@ -43,6 +44,7 @@ const DashboardScreen = ({ navigation }: any) => {
 
   const checkConnection = async () => {
     const endpoints = [
+      'http://192.168.42.1/api/v1/peripheral/wifi',
       'http://192.168.42.1/api/v1/system/deviceinfo',
       'http://192.168.42.1/api/v1/paramline'
     ];
@@ -52,7 +54,7 @@ const DashboardScreen = ({ navigation }: any) => {
     for (const url of endpoints) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
 
         const response = await fetch(url, {
           method: 'GET',
@@ -63,17 +65,27 @@ const DashboardScreen = ({ navigation }: any) => {
         clearTimeout(timeoutId);
 
         if (response.ok) {
-          if (url.includes('deviceinfo')) {
-            const data = await response.json();
-            const name = data.deviceName || data.model || data.hostname || 'BullsEye Device';
+          const data = await response.json();
+          let name = '';
+
+          if (url.includes('wifi')) {
+            // Priority 1: SSID from wifi endpoint
+            name = data.ssid || data.value?.ssid;
+          } else if (url.includes('deviceinfo')) {
+            // Priority 2: Device info fields
+            name = data.deviceName || data.model || data.hostname;
+          }
+
+          if (name) {
             setDeviceName(name);
             await AsyncStorage.setItem('lastConnectedDevice', name);
           }
+
           success = true;
           break;
         }
       } catch (error) {
-        // Fail fast
+        // Fail fast for individual endpoints
       }
     }
 
@@ -185,16 +197,19 @@ const DashboardScreen = ({ navigation }: any) => {
 
         <View style={styles.grid}>
           {[
-            { id: 1, label: 'RECORDINGS', icon: 'video-vintage', color: '#FF9800' },
-            { id: 2, label: 'GALLERY', icon: 'view-grid-outline', color: '#00E5FF' },
+            { id: 1, label: 'RECORDINGS', icon: 'video-vintage', color: '#00E5FF', route: 'gallery', isTab: true },
+            { id: 2, label: 'USER GUIDE', icon: 'book-open-variant', color: '#FF9800', route: 'QuickUserGuide' },
+            { id: 3, label: 'HISTORY', icon: 'history', color: '#4CAF50', route: 'DeviceHistory' },
+            { id: 4, label: 'F.A.Q', icon: 'help-circle-outline', color: '#E91E63', route: 'FAQ' },
           ].map((item) => (
             <TouchableOpacity
               key={item.id}
               style={styles.gridItem}
               onPress={() => {
-                if (item.label === 'GALLERY') {
-                  DeviceEventEmitter.emit('changeTab', 'gallery');
+                if (item.isTab) {
+                  DeviceEventEmitter.emit('changeTab', item.route);
                 }
+                navigation.navigate(item.route);
               }}
             >
               <Surface style={styles.gridSurface} elevation={1}>
@@ -341,7 +356,9 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    rowGap: 16,
   },
   gridItem: {
     width: '48%',

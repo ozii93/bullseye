@@ -167,22 +167,27 @@ async function setZeroCalibrationCoord(x: number, y: number) {
 
 async function fetchCurrentCalibrationData() {
   try {
-    // Correct URL is /api/v1/paramline, NOT under /peripheral/
     const response = await fetch('http://192.168.42.1/api/v1/paramline');
     const buffer = await response.arrayBuffer();
     const data = new Uint8Array(buffer);
 
-    // Validate header (0xAA 0x55)
     if (data[0] === 0xAA && data[1] === 0x55) {
       const view = new DataView(buffer);
-      // X: Index 133, Y: Index 135 (Little Endian 16-bit signed)
       const currentX = view.getInt16(133, true);
       const currentY = view.getInt16(135, true);
       const currentDist = view.getUint16(130, true);
       const isFrozen = data[132] !== 0;
+      // Bytes 16-17: luminance, 18-19: contrast (divided by 10)
+      const luminance = view.getUint16(16, true);
+      const contrast = view.getUint16(18, true);
+      // Bytes 12-13: enhancement
+      const enhancement = view.getUint16(12, true);
 
-      console.log(`📡 Hardware Paramline Sync -> X: ${currentX}, Y: ${currentY}, Dist: ${currentDist}`);
-      return { x: currentX, y: currentY, distance: currentDist, isFrozen };
+      console.log(`📡 Paramline — X:${currentX} Y:${currentY} Dist:${currentDist} Lum:${luminance} Con:${contrast} Enh:${enhancement}`);
+      return {
+        x: currentX, y: currentY, distance: currentDist, isFrozen,
+        luminance, contrast, enhancement,
+      };
     }
     return null;
   } catch (e) {
@@ -242,6 +247,72 @@ async function getZeroCalibrationCoord(): Promise<{ x: number; y: number } | nul
     console.log('⚠️ Could not fetch current coords (endpoint might not support GET):', error);
     return null;
   }
+}
+
+/* =========================================================
+   SCENE MODE / LASER / AI TRACKING HELPERS
+======================================================== */
+
+const CommandScene = [0x02, 0x03, 0x07];
+const CommandAITrack = [0x02, 0x00, 0x0a];
+const CommandLuminanc = [0x02, 0x03, 0x09];
+const CommandContras = [0x02, 0x03, 0x0a];
+const CommandEnhancement = [0x02, 0x03, 0x0b];
+
+async function sendScene(mode: number) {
+  const payload = structSerialPortParam(CommandScene, mode);
+  const packet = buildPacket(payload);
+  await sendBinary(packet);
+}
+
+async function sendLaserRanging(mode: number) {
+  const url = 'http://192.168.42.1/api/v1/peripheral/rangingtype';
+  const payload = JSON.stringify({ value: String(mode) });
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ Laser ranging set to ${mode}:`, result);
+  } catch (error) {
+    console.error('❌ Gagal laser ranging:', error);
+  }
+}
+
+async function sendAITracking(on: boolean) {
+  const url = 'http://192.168.42.1/api/v1/camera/ai_tracking';
+  const payload = JSON.stringify({ value: on ? 'on' : 'off' });
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ AI Tracking ${on ? 'ON' : 'OFF'}:`, result);
+  } catch (error) {
+    console.error('❌ Gagal AI tracking:', error);
+  }
+}
+
+async function sendLuminanc(value: number) {
+  const payload = structSerialPortParam(CommandLuminanc, value);
+  const packet = buildPacket(payload);
+  await sendBinary(packet);
+}
+
+async function sendContras(value: number) {
+  const payload = structSerialPortParam(CommandContras, value);
+  const packet = buildPacket(payload);
+  await sendBinary(packet);
+}
+
+async function sendEnhancement(value: number) {
+  const payload = structSerialPortParam(CommandEnhancement, value);
+  const packet = buildPacket(payload);
+  await sendBinary(packet);
 }
 
 /* =========================================================
@@ -388,7 +459,29 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
   const [isLoadingDistances, setIsLoadingDistances] = useState(false);
   const [isCustomZeroCal, setIsCustomZeroCal] = useState(false);
 
+  // Scene Mode state
+  const [sceneMode, setSceneMode] = useState(0);
+
+  // Laser Ranging state
+  const [laserRangingMode, setLaserRangingMode] = useState(0);
+  const [isLaserActive, setIsLaserActive] = useState(false);
+
+  // AI Tracking state
+  const [isAITrackingActive, setIsAITrackingActive] = useState(false);
+
+  // Toolkit panel state
+  const [isToolkitVisible, setIsToolkitVisible] = useState(false);
+
+  // Image Adjustment state
+  const [brightness, setBrightness] = useState(3);
+  const [contrast, setContrast] = useState(3);
+  const [isEnhancementOn, setIsEnhancementOn] = useState(false);
+
+  // Image Adjustment panel
+  const [isImageAdjustVisible, setIsImageAdjustVisible] = useState(false);
+
   useEffect(() => {
+    console.log('📂 STORAGE PATH:', RNFS.DocumentDirectoryPath);
     const loadLatestThumbnail = async () => {
       try {
         const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath);
@@ -481,23 +574,35 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
     return `${minutes}:${seconds}`;
   };
 
+  const SCENE_MODES = [
+    { value: 0, label: 'Natural' },
+    { value: 5, label: 'Enhanced' },
+    { value: 6, label: 'Highlight' },
+  ];
+
   const handleCapture = async () => {
     try {
-      console.log('🔗 Triggering hardware calibration...');
-      await fetch('http://192.168.42.1/api/v1/paramline');
-
-      const filename = `BullsEye${Date.now()}.png`;
+      console.log('📸 Taking Tactical Snapshot...');
+      const filename = `BullsEye_${Date.now()}.png`;
       const localPath = `${RNFS.DocumentDirectoryPath}/${filename}`;
 
-      await RNFS.downloadFile({
-        fromUrl: 'http://192.168.42.1/screenshot/',
-        toFile: localPath,
-      }).promise;
+      // Trigger native snapshot (Same way as video)
+      guideRef.current?.snapShot(localPath);
 
-      console.log('📸 Saved:', localPath);
-      setLastMedia(`file://${localPath}`);
-    } catch (e) {
+      // Wait a moment for the native side to finish writing
+      setTimeout(async () => {
+        if (await RNFS.exists(localPath)) {
+          console.log('✅ Snapshot Secure:', localPath);
+          setLastMedia(`file://${localPath}`);
+          Alert.alert("Sukses", `Foto berhasil disimpan`);
+        } else {
+          Alert.alert("GAGAL", "Gagal menyimpan foto. Coba lagi.");
+        }
+      }, 1000);
+
+    } catch (e: any) {
       console.log('❌ Capture Error:', e);
+      Alert.alert("CAPTURE FAILED", "Gagal mengeksekusi pengambilan foto.");
     }
   };
 
@@ -512,7 +617,7 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
         await fetch("http://192.168.42.1/api/v1/paramline").catch(() => { });
 
         const filename = `BullsEye_${Date.now()}.mp4`;
-        const savePath = `${RNFS.CachesDirectoryPath}/${filename}`;
+        const savePath = `${RNFS.DocumentDirectoryPath}/${filename}`;
         console.log("🎥 Save to:", savePath);
 
         guideRef.current?.startRecord(savePath);
@@ -528,12 +633,23 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
     const { path } = event.nativeEvent;
     console.log("✅ Record complete:", path);
     setLastMedia(`file://${path}`);
-    Alert.alert("Sukses", "Video berhasil direkam");
+    Alert.alert("Sukses", `Video berhasil direkam`);
   };
 
   const handleOpenZeroCalibration = async () => {
     setIsZeroCalibrationVisible(true);
     setIsLoadingDistances(true);
+
+    // Sync current X/Y coordinates from device paramline
+    const hwData = await fetchCurrentCalibrationData();
+    if (hwData) {
+      setCoordX(hwData.x);
+      setCoordY(hwData.y);
+      setIsFrozen(hwData.isFrozen);
+    } else {
+      setCoordX(0);
+      setCoordY(0);
+    }
 
     // Step 1: try to fetch distance list from device (GET custom_zero_calibration)
     const dists = await getCustomZeroCalibration();
@@ -554,17 +670,6 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
       // Non-custom mode: value is the DISTANCE itself
       setSelectedDistance(100);
       console.log('🔧 Mode: STANDARD — sending distance 100');
-    }
-
-    // Sync current X/Y coordinates from device paramline
-    const hwData = await fetchCurrentCalibrationData();
-    if (hwData) {
-      setCoordX(hwData.x);
-      setCoordY(hwData.y);
-      setIsFrozen(hwData.isFrozen);
-    } else {
-      setCoordX(0);
-      setCoordY(0);
     }
 
     // Step 2: send command to device
@@ -591,6 +696,15 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
       }
     }
 
+    // Step 3: re-fetch coordinates AFTER device enters zero cal mode
+    await new Promise<void>(r => setTimeout(r, 300));
+    const updatedHwData = await fetchCurrentCalibrationData();
+    if (updatedHwData) {
+      setCoordX(updatedHwData.x);
+      setCoordY(updatedHwData.y);
+      setIsFrozen(updatedHwData.isFrozen);
+    }
+
     setIsLoadingDistances(false);
   };
 
@@ -611,7 +725,7 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
       await startZeroCalibration(dist);
     }
     // Wait a moment then re-fetch — device needs time to update after distance change
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 300));
     const hwData = await fetchCurrentCalibrationData();
     if (hwData) {
       setCoordX(hwData.x);
@@ -695,11 +809,20 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
           </View>
 
           <View style={styles.headerCenter}>
-            <View style={[styles.statusBadge, isRecording && { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
-              <View style={[styles.liveDot, isRecording && { backgroundColor: '#FF3B30' }]} />
-              <Text style={[styles.statusText, isRecording && { color: '#FF3B30' }]}>
-                {isRecording ? 'REC' : 'LIVE'}
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <IconButton
+                icon="toolbox-outline"
+                iconColor={isToolkitVisible ? '#FF9800' : '#FFF'}
+                size={22}
+                onPress={() => setIsToolkitVisible(!isToolkitVisible)}
+                style={{ marginRight: 8 }}
+              />
+              <View style={[styles.statusBadge, isRecording && { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
+                <View style={[styles.liveDot, isRecording && { backgroundColor: '#FF3B30' }]} />
+                <Text style={[styles.statusText, isRecording && { color: '#FF3B30' }]}>
+                  {isRecording ? 'REC' : 'LIVE'}
+                </Text>
+              </View>
             </View>
 
             {isRecording && (
@@ -709,7 +832,7 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
 
           <View style={styles.headerRight}>
             <IconButton
-              icon="crosshairs-gps"
+              icon="crosshairs"
               iconColor={showReticle ? '#00E5FF' : '#FFF'}
               size={24}
               onPress={async () => {
@@ -720,11 +843,23 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
                   // Enable reticle on hardware with current type
                   await setHardwareReticleType(reticleType);
                   await setHardwareReticleBrightness(reticleBrightness);
-                  await setHardwareReticleColor(RETICLE_COLORS[reticleColor].name.toLowerCase());
+                  await setHardwareReticleColor(RETICLE_COLORS[reticleColor].id);
                 } else {
                   setIsReticleToolsVisible(false);
                   // Disable reticle on hardware by setting type to 0
                   await setHardwareReticleType(0);
+                }
+              }}
+            />
+            <IconButton
+              icon="target"
+              iconColor={isZeroCalibrationVisible ? '#FF9800' : '#FFF'}
+              size={24}
+              onPress={() => {
+                if (isZeroCalibrationVisible) {
+                  handleCloseZeroCalibration();
+                } else {
+                  handleOpenZeroCalibration();
                 }
               }}
             />
@@ -844,8 +979,8 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
                       ]}
                       onPress={async () => {
                         setReticleColor(c.id);
-                        // Send the color name in lowercase as expected by hardware
-                        await setHardwareReticleColor(RETICLE_COLORS[c.id].name.toLowerCase());
+                        // Send the color ID as expected by hardware
+                        await setHardwareReticleColor(c.id);
                       }}
                     >
                       <View style={[styles.colorSwatch, { backgroundColor: c.color }]} />
@@ -886,24 +1021,25 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
                           ? selectedDistance === item.index
                           : selectedDistance === item.distance;
                         return (
-                        <TouchableOpacity
-                          key={item.index}
-                          style={[
-                            styles.typePill,
-                            isActive && styles.activeTypePill,
-                          ]}
-                          onPress={() => handleZeroCalDistanceSelect(item.distance, item.index)}
-                        >
-                          <Text
+                          <TouchableOpacity
+                            key={item.index}
                             style={[
-                              styles.typeText,
-                              isActive && styles.activeTypeText,
+                              styles.typePill,
+                              isActive && styles.activeTypePill,
                             ]}
+                            onPress={() => handleZeroCalDistanceSelect(item.distance, item.index)}
                           >
-                            {item.distance}
-                          </Text>
-                        </TouchableOpacity>
-                      )})}
+                            <Text
+                              style={[
+                                styles.typeText,
+                                isActive && styles.activeTypeText,
+                              ]}
+                            >
+                              {item.distance}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      })}
                     </View>
                   </ScrollView>
 
@@ -998,6 +1134,126 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
             </View>
           )}
 
+          {isToolkitVisible && (
+            <View style={styles.toolkitWrapper}>
+              <View style={styles.toolkitHeader}>
+                <Text style={styles.toolkitTitle}>TOOLKIT</Text>
+                <TouchableOpacity onPress={() => setIsToolkitVisible(false)} style={styles.zeroCalBackBtn}>
+                  <Text style={styles.zeroCalBackText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.toolkitLabel}>Scene Mode</Text>
+              <View style={styles.typeRow}>
+                {SCENE_MODES.map((s) => (
+                  <TouchableOpacity
+                    key={s.value}
+                    style={[styles.typePill, sceneMode === s.value && styles.activeTypePill]}
+                    onPress={async () => { setSceneMode(s.value); await sendScene(s.value); }}
+                  >
+                    <Text style={[styles.typeText, sceneMode === s.value && styles.activeTypeText]}>{s.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.toolkitLabel}>Laser Ranging</Text>
+              <View style={styles.typeRow}>
+                {[{ value: 0, label: 'OFF' }, { value: 1, label: 'Single' }, { value: 2, label: 'Continuous' }].map((l) => (
+                  <TouchableOpacity
+                    key={l.value}
+                    style={[styles.typePill, laserRangingMode === l.value && styles.activeTypePill]}
+                    onPress={async () => { setLaserRangingMode(l.value); setIsLaserActive(l.value !== 0); await sendLaserRanging(l.value); }}
+                  >
+                    <Text style={[styles.typeText, laserRangingMode === l.value && styles.activeTypeText]}>{l.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.toolkitLabel}>AI Tracking</Text>
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  style={[styles.typePill, !isAITrackingActive && styles.activeTypePill]}
+                  onPress={async () => { if (isAITrackingActive) { setIsAITrackingActive(false); await sendAITracking(false); } }}
+                >
+                  <Text style={[styles.typeText, !isAITrackingActive && styles.activeTypeText]}>OFF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typePill, isAITrackingActive && styles.activeTypePill]}
+                  onPress={async () => { if (!isAITrackingActive) { setIsAITrackingActive(true); await sendAITracking(true); } }}
+                >
+                  <Text style={[styles.typeText, isAITrackingActive && styles.activeTypeText]}>ON</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {isImageAdjustVisible && (
+            <View style={styles.toolkitWrapper}>
+              <View style={styles.toolkitHeader}>
+                <Text style={styles.toolkitTitle}>IMAGE ADJUST</Text>
+                <TouchableOpacity onPress={() => setIsImageAdjustVisible(false)} style={styles.zeroCalBackBtn}>
+                  <Text style={styles.zeroCalBackText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.toolkitLabel}>Brightness: {brightness}</Text>
+              <View style={styles.sliderRow}>
+                <Text style={styles.sliderMin}>1</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={1}
+                  maximumValue={5}
+                  step={1}
+                  value={brightness}
+                  onSlidingComplete={async (v: number) => {
+                    setBrightness(v);
+                    await sendLuminanc(v);
+                  }}
+                  minimumTrackTintColor="#00E5FF"
+                  maximumTrackTintColor="rgba(255,255,255,0.2)"
+                  thumbTintColor="#00E5FF"
+                />
+                <Text style={styles.sliderMax}>5</Text>
+              </View>
+
+              <Text style={styles.toolkitLabel}>Contrast: {contrast}</Text>
+              <View style={styles.sliderRow}>
+                <Text style={styles.sliderMin}>1</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={1}
+                  maximumValue={5}
+                  step={1}
+                  value={contrast}
+                  onSlidingComplete={async (v: number) => {
+                    setContrast(v);
+                    await sendContras(v);
+                  }}
+                  minimumTrackTintColor="#00E5FF"
+                  maximumTrackTintColor="rgba(255,255,255,0.2)"
+                  thumbTintColor="#00E5FF"
+                />
+                <Text style={styles.sliderMax}>5</Text>
+              </View>
+
+              <Text style={styles.toolkitLabel}>Image Enhancement</Text>
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  style={[styles.typePill, !isEnhancementOn && styles.activeTypePill]}
+                  onPress={async () => { if (isEnhancementOn) { setIsEnhancementOn(false); await sendEnhancement(0); } }}
+                >
+                  <Text style={[styles.typeText, !isEnhancementOn && styles.activeTypeText]}>OFF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typePill, isEnhancementOn && styles.activeTypePill]}
+                  onPress={async () => { if (!isEnhancementOn) { setIsEnhancementOn(true); await sendEnhancement(1); } }}
+                >
+                  <Text style={[styles.typeText, isEnhancementOn && styles.activeTypeText]}>ON</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <View style={styles.bottomDock}>
             <View style={styles.dockItem}>
               <TouchableOpacity
@@ -1042,14 +1298,19 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
 
             <View style={styles.dockItem}>
               <IconButton
-                icon="target"
-                iconColor={isZeroCalibrationVisible ? '#FF9800' : '#FFF'}
+                icon="brightness-6"
+                iconColor={isImageAdjustVisible ? '#00E5FF' : '#FFF'}
                 size={30}
-                onPress={() => {
-                  if (isZeroCalibrationVisible) {
-                    handleCloseZeroCalibration();
-                  } else {
-                    handleOpenZeroCalibration();
+                onPress={async () => {
+                  const opening = !isImageAdjustVisible;
+                  setIsImageAdjustVisible(opening);
+                  if (opening) {
+                    const hw = await fetchCurrentCalibrationData();
+                    if (hw) {
+                      setBrightness(Math.min(5, Math.max(1, hw.luminance)));
+                      setContrast(Math.min(5, Math.max(1, hw.contrast)));
+                      setIsEnhancementOn(hw.enhancement !== 0);
+                    }
                   }
                 }}
               />
@@ -1537,7 +1798,39 @@ const styles = StyleSheet.create({
   },
   zeroCalConfirmText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
+  },
+  toolkitWrapper: {
+    width: '94%',
+    backgroundColor: 'rgba(20,20,20,0.92)',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,152,0,0.15)',
+  },
+  toolkitHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  toolkitTitle: {
+    color: '#FF9800',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  toolkitLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 10,
   },
 });

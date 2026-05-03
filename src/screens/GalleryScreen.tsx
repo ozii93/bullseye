@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -8,9 +8,13 @@ import {
   Dimensions,
   Text,
   StatusBar,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Surface, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons'
 import RNFS from 'react-native-fs';
 
@@ -18,57 +22,142 @@ const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 3;
 const ITEM_SIZE = width / COLUMN_COUNT;
 
+interface DeviceFile {
+  name: string;
+  type: 'image' | 'video';
+  size: string;
+}
+
 const GalleryScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'local' | 'device'>('local');
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
+  const [cloudFiles, setCloudFiles] = useState<DeviceFile[]>([]);
+  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const loadMedia = async () => {
-      try {
-        const files = await RNFS.readDir(RNFS.DocumentDirectoryPath);
-        const media = files.filter(f => 
-          f.name.endsWith('.png') || 
-          f.name.endsWith('.jpg') || 
-          f.name.endsWith('.mp4')
-        );
-        
-        media.sort((a, b) => {
-          const dateA = a.mtime ? new Date(a.mtime).getTime() : 0;
-          const dateB = b.mtime ? new Date(b.mtime).getTime() : 0;
-          return dateB - dateA;
-        });
-
-        setMediaFiles(media.map(f => `file://${f.path}`));
-      } catch (error) {
-        console.log('❌ Error load gallery:', error);
+  const loadMedia = useCallback(async () => {
+    try {
+      const dirs = [
+        RNFS.ExternalDirectoryPath + '/DCIM/BullsEye',
+        RNFS.ExternalDirectoryPath + '/DCIM/GUIDECAMERA',
+        RNFS.DocumentDirectoryPath,
+        RNFS.CachesDirectoryPath,
+      ];
+      const allFiles: any[] = [];
+      for (const dir of dirs) {
+        try {
+          const entries = await RNFS.readDir(dir);
+          allFiles.push(...entries);
+        } catch { /* dir may not exist */ }
       }
-    };
 
-    loadMedia();
-    const unsubscribe = navigation.addListener('focus', loadMedia);
-    return unsubscribe;
-  }, [navigation]);
+      const media = allFiles.filter((f: any) =>
+        f.name.endsWith('.png') ||
+        f.name.endsWith('.jpg') ||
+        f.name.endsWith('.mp4')
+      );
+
+      media.sort((a: any, b: any) => {
+        const dateA = a.mtime ? new Date(a.mtime).getTime() : 0;
+        const dateB = b.mtime ? new Date(b.mtime).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      setMediaFiles(media.map((f: any) => `file://${f.path}`));
+    } catch (error) {
+      console.log('❌ Error load gallery:', error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMedia();
+    }, [loadMedia])
+  );
+
+  const fetchCloudFiles = async () => {
+    setIsLoadingCloud(true);
+    setCloudError(null);
+    try {
+      const response = await fetch('http://192.168.42.1/api/v1/files');
+      const data = await response.json();
+      const files: DeviceFile[] = (data.value || [])
+        .filter((f: any) => {
+          const n = f.name || '';
+          return n.startsWith('IMG') || n.startsWith('IVR');
+        })
+        .map((f: any) => ({
+          name: f.name,
+          type: f.type === 'video' ? 'video' : 'image',
+          size: f.size || '-',
+        }));
+      files.sort((a, b) => b.name.localeCompare(a.name));
+      setCloudFiles(files);
+    } catch (error) {
+      console.log('❌ Error fetch device files:', error);
+      setCloudError('CANNOT CONNECT TO DEVICE');
+      setCloudFiles([]);
+    }
+    setIsLoadingCloud(false);
+  };
+
+  const handleDeviceFilePress = async (file: DeviceFile) => {
+    try {
+      const filename = file.name;
+      const localPath = `${RNFS.CachesDirectoryPath}/${filename}`;
+      const exists = await RNFS.exists(localPath);
+      if (!exists) {
+        const url = file.type === 'video'
+          ? `http://192.168.42.1/api/v1/files/videos/${filename}`
+          : `http://192.168.42.1/api/v1/files/download/${filename}`;
+        await RNFS.downloadFile({ fromUrl: url, toFile: localPath }).promise;
+      }
+      navigation.navigate('RecentMedia', { uri: `file://${localPath}` });
+    } catch (error) {
+      console.log('❌ Error download device file:', error);
+      Alert.alert('Error', 'Gagal mengunduh file dari device');
+    }
+  };
 
   const renderMediaItem = ({ item }: { item: string }) => {
     const isVideo = item.endsWith('.mp4');
-
     return (
-      <TouchableOpacity 
-        style={styles.mediaItem}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate('RecentMedia', { uri: item })}
-      >
+      <TouchableOpacity style={styles.mediaItem} activeOpacity={0.8}
+        onPress={() => navigation.navigate('RecentMedia', { uri: item })}>
         <Surface style={styles.thumbnailFrame} elevation={2}>
           <Image source={{ uri: item }} style={styles.thumbnail} />
-          {isVideo && (
-            <View style={styles.videoOverlay}>
-              <MaterialDesignIcons name="play-circle-outline" size={28} color="#FFF" />
-            </View>
-          )}
+          {isVideo && <View style={styles.videoOverlay}>
+            <MaterialDesignIcons name="play-circle-outline" size={28} color="#FFF" />
+          </View>}
         </Surface>
       </TouchableOpacity>
     );
   };
+
+  const renderDeviceItem = ({ item }: { item: DeviceFile }) => {
+    const isVideo = item.type === 'video';
+    const thumbUrl = isVideo
+      ? `http://192.168.42.1/api/v1/files/videos/${item.name}/thumb/1`
+      : `http://192.168.42.1/api/v1/files/download/${item.name}`;
+    return (
+      <TouchableOpacity style={styles.mediaItem} activeOpacity={0.8}
+        onPress={() => handleDeviceFilePress(item)}>
+        <Surface style={styles.thumbnailFrame} elevation={2}>
+          <Image source={{ uri: thumbUrl }} style={styles.thumbnail} />
+          {isVideo && <View style={styles.videoOverlay}>
+            <MaterialDesignIcons name="play-circle-outline" size={28} color="#FFF" />
+          </View>}
+        </Surface>
+      </TouchableOpacity>
+    );
+  };
+
+  useEffect(() => {
+    if (activeTab === 'device') {
+      fetchCloudFiles();
+    }
+  }, [activeTab]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -123,27 +212,58 @@ const GalleryScreen = ({ navigation }: any) => {
               numColumns={COLUMN_COUNT}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={async () => { setRefreshing(true); await loadMedia(); setRefreshing(false); }}
+                  tintColor="#D32F2F"
+                  colors={['#D32F2F']}
+                />
+              }
             />
           ) : (
             <View style={styles.emptyContainer}>
               <MaterialDesignIcons name="database-off-outline" size={60} color="rgba(255,255,255,0.05)" />
               <Text style={styles.emptyText}>NO DATA DETECTED IN STORAGE</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={async () => { setRefreshing(true); await loadMedia(); setRefreshing(false); }}>
+                <Text style={styles.retryText}>REFRESH</Text>
+              </TouchableOpacity>
             </View>
           )
         ) : (
-          <View style={styles.devContainer}>
-            <Surface style={styles.devCard} elevation={4}>
-              <MaterialDesignIcons name="access-point-network-off" size={50} color="#D32F2F" />
-              <Text style={styles.devTitle}>REMOTE ACCESS RESTRICTED</Text>
-              <Text style={styles.devSubtitle}>
-                DIRECT CLOUD SYNCHRONIZATION IS CURRENTLY UNDER CALIBRATION.
-              </Text>
-              <View style={styles.progressBar}>
-                <View style={styles.progressFill} />
-              </View>
-              <Text style={styles.progressText}>UPDATING SYSTEM... 65%</Text>
-            </Surface>
-          </View>
+          isLoadingCloud ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color="#D32F2F" />
+              <Text style={styles.loadingText}>ACCESSING REMOTE DEVICE...</Text>
+            </View>
+          ) : cloudError ? (
+            <View style={styles.devContainer}>
+              <Surface style={styles.devCard} elevation={4}>
+                <MaterialDesignIcons name="access-point-network-off" size={50} color="#D32F2F" />
+                <Text style={styles.devTitle}>CONNECTION LOST</Text>
+                <Text style={styles.devSubtitle}>
+                  {cloudError}{'\n'}CONNECT TO DEVICE WIFI AND RETRY
+                </Text>
+                <TouchableOpacity style={styles.retryButton} onPress={fetchCloudFiles}>
+                  <Text style={styles.retryText}>RETRY</Text>
+                </TouchableOpacity>
+              </Surface>
+            </View>
+          ) : cloudFiles.length > 0 ? (
+            <FlatList
+              data={cloudFiles}
+              renderItem={renderDeviceItem}
+              keyExtractor={(item) => item.name}
+              numColumns={COLUMN_COUNT}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <MaterialDesignIcons name="cloud-off-outline" size={60} color="rgba(255,255,255,0.05)" />
+              <Text style={styles.emptyText}>NO FILES ON REMOTE DEVICE</Text>
+            </View>
+          )
         )}
       </View>
     </SafeAreaView>
@@ -281,25 +401,27 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 30,
   },
-  progressBar: {
-    width: '100%',
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 2,
-    marginBottom: 10,
-  },
-  progressFill: {
-    width: '65%',
-    height: '100%',
-    backgroundColor: '#D32F2F',
-    borderRadius: 2,
-  },
-  progressText: {
-    color: '#D32F2F',
-    fontSize: 8,
+  loadingText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
     fontWeight: 'bold',
-    letterSpacing: 1,
-  }
+    letterSpacing: 2,
+    marginTop: 16,
+  },
+  retryButton: {
+    backgroundColor: 'rgba(211,47,47,0.15)',
+    borderWidth: 1,
+    borderColor: '#D32F2F',
+    borderRadius: 8,
+    paddingHorizontal: 30,
+    paddingVertical: 10,
+  },
+  retryText: {
+    color: '#D32F2F',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+  },
 });
 
 export default GalleryScreen;

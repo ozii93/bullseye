@@ -23,6 +23,9 @@ class GuideStreamView(context: Context) : TextureView(context), TextureView.Surf
 
     companion object {
         private const val TAG = "GuideStreamView"
+        const val COMMAND_START_RECORD = 1
+        const val COMMAND_STOP_RECORD = 2
+        const val COMMAND_SNAPSHOT = 3
     }
 
     private var guideMedia: GuideMedia? = null
@@ -96,6 +99,33 @@ class GuideStreamView(context: Context) : TextureView(context), TextureView.Surf
             emitEvent("onRecordComplete", event)
         }
         currentRecordPath = null
+    }
+
+    fun snapShot(path: String) {
+        synchronized(frameLock) {
+            val bmp = currentBitmap
+            if (bmp == null || bmp.isRecycled) {
+                Log.e(TAG, "snapShot failed: currentBitmap is null or recycled")
+                return
+            }
+            
+            // Create a copy to save on a background thread to avoid stuttering
+            val config = bmp.config ?: Bitmap.Config.ARGB_8888
+            val copy = bmp.copy(config, false)
+            renderHandler?.post {
+                try {
+                    val file = java.io.File(path)
+                    val out = java.io.FileOutputStream(file)
+                    copy.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    out.flush()
+                    out.close()
+                    copy.recycle()
+                    Log.d(TAG, "✅ SNAPSHOT SAVED TO: $path")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ snapShot error: ${e.message}")
+                }
+            }
+        }
     }
 
     // TextureView.SurfaceTextureListener

@@ -17,6 +17,7 @@ interface GuideStreamViewProps {
 export interface GuideStreamViewRef {
   startRecord: (path: string) => void;
   stopRecord: () => void;
+  snapShot: (path: string) => void;
 }
 
 const RCTGuideStreamView = requireNativeComponent<GuideStreamViewProps>('GuideStreamView');
@@ -45,6 +46,17 @@ const GuideStreamView = forwardRef<GuideStreamViewRef, GuideStreamViewProps>(
             (UIManager.getViewManagerConfig?.('GuideStreamView') as any)
               ?.Commands?.stopRecord ?? 'stopRecord',
             [],
+          );
+        }
+      },
+      snapShot(path: string) {
+        const node = findNodeHandle(nativeRef.current);
+        if (node != null) {
+          UIManager.dispatchViewManagerCommand(
+            node,
+            (UIManager.getViewManagerConfig?.('GuideStreamView') as any)
+              ?.Commands?.snapShot ?? 'snapShot',
+            [path],
           );
         }
       },

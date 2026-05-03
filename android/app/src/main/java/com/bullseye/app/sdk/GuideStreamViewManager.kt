@@ -11,6 +11,7 @@ class GuideStreamViewManager : SimpleViewManager<GuideStreamView>() {
     companion object {
         private const val COMMAND_START_RECORD = 1
         private const val COMMAND_STOP_RECORD = 2
+        private const val COMMAND_SNAPSHOT = 3
     }
 
     override fun getName() = "GuideStreamView"
@@ -29,7 +30,8 @@ class GuideStreamViewManager : SimpleViewManager<GuideStreamView>() {
     override fun getCommandsMap(): MutableMap<String, Int> {
         return mutableMapOf(
             "startRecord" to COMMAND_START_RECORD,
-            "stopRecord" to COMMAND_STOP_RECORD
+            "stopRecord" to COMMAND_STOP_RECORD,
+            "snapShot" to COMMAND_SNAPSHOT
         )
     }
 
@@ -40,6 +42,10 @@ class GuideStreamViewManager : SimpleViewManager<GuideStreamView>() {
                 view.startRecord(path)
             }
             COMMAND_STOP_RECORD -> view.stopRecord()
+            COMMAND_SNAPSHOT -> {
+                val path = args?.getString(0) ?: return
+                view.snapShot(path)
+            }
         }
     }
 

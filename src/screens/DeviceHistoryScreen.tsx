@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar } from 'react-native';
 import { IconButton, Surface, Divider } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface DeviceHistoryItem {
   id: string;
@@ -12,7 +13,7 @@ interface DeviceHistoryItem {
 }
 
 const DeviceHistoryScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [history, setHistory] = useState<DeviceHistoryItem[]>([]);
 
   useEffect(() => {
@@ -58,27 +59,28 @@ const DeviceHistoryScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
-      <SafeAreaView style={styles.header}>
-        <View style={styles.headerContent}>
-          <IconButton
-            icon="arrow-left"
-            iconColor="#FFF"
-            size={24}
-            onPress={() => navigation.goBack()}
-          />
-          <Text style={styles.headerTitle}>DEVICE HISTORY</Text>
-          <IconButton
-            icon="delete-outline"
-            iconColor="#EF5350"
-            size={24}
-            onPress={clearHistory}
-          />
+      <View style={styles.header}>
+        <IconButton 
+          icon="chevron-left" 
+          iconColor="#FFF" 
+          size={32}
+          onPress={() => navigation.goBack()} 
+        />
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>DEVICE HISTORY</Text>
+          <Text style={styles.subtitle}>COMMUNICATION LOGS</Text>
         </View>
-      </SafeAreaView>
+        <IconButton 
+          icon="delete-outline" 
+          iconColor="#D32F2F" 
+          size={24} 
+          onPress={clearHistory} 
+        />
+      </View>
 
       <FlatList
         data={history}
@@ -93,40 +95,48 @@ const DeviceHistoryScreen = () => {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#10182b',
+    backgroundColor: '#05070a',
   },
   header: {
-    backgroundColor: '#1a2236',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2b384b',
-  },
-  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    height: 60,
+    paddingHorizontal: 10,
+    marginBottom: 20,
   },
-  headerTitle: {
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '900',
     color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
     letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#D32F2F',
+    letterSpacing: 1.5,
+    marginTop: 2,
   },
   listContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   deviceCard: {
-    backgroundColor: '#1a2236',
-    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
     borderLeftWidth: 3,
     borderLeftColor: '#00E5FF',
   },
