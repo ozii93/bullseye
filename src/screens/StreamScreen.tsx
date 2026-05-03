@@ -17,8 +17,54 @@ import GuideStreamView, { GuideStreamViewRef } from '../components/GuideStreamVi
 import RNFS from 'react-native-fs';
 import { PALETTES as PalettesConstant } from '../core/constant';
 import { createThumbnail } from 'react-native-create-thumbnail';
+import Slider from '@react-native-community/slider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const RETICLE_TYPES = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Type ${i + 1}` }));
+
+const RETICLE_COLORS = [
+  { id: 0, name: 'Green', color: '#00FF00' },
+  { id: 1, name: 'Black', color: '#000000' },
+  { id: 2, name: 'White', color: '#FFFFFF' },
+  { id: 3, name: 'Red', color: '#FF0000' },
+];
+
+/* =========================================================
+   HARDWARE COMMAND HELPERS
+======================================================== */
+
+async function sendReticleCommand(endpoint: string, value: string) {
+  const url = `http://192.168.42.1/api/v1/peripheral/${endpoint}`;
+  const payload = JSON.stringify({ value });
+
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: payload,
+    });
+    const result = await response.text();
+    console.log(`✅ Reticle ${endpoint} set to ${value}:`, result);
+  } catch (error) {
+    console.error(`❌ Gagal set reticle ${endpoint}:`, error);
+  }
+}
+
+async function setHardwareReticleType(index: number) {
+  await sendReticleCommand('dashtype', String(index));
+}
+
+async function setHardwareReticleColor(index: number) {
+  await sendReticleCommand('dashcolor', String(index));
+}
+
+async function setHardwareReticleBrightness(value: number) {
+  await sendReticleCommand('dashlight', String(value));
+}
+
 
 /* =========================================================
    CONFIG
@@ -147,6 +193,11 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
   const [renderPlayer, setRenderPlayer] = useState(false);
   const [lastMedia, setLastMedia] = useState<string | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [showReticle, setShowReticle] = useState(false);
+  const [isReticleToolsVisible, setIsReticleToolsVisible] = useState(false);
+  const [reticleBrightness, setReticleBrightness] = useState(5);
+  const [reticleType, setReticleType] = useState(1);
+  const [reticleColor, setReticleColor] = useState(0);
 
   useEffect(() => {
     const loadLatestThumbnail = async () => {
@@ -309,6 +360,10 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
         />
       )}
 
+
+      {/* Reticle Overlay removed as it is now handled by hardware */}
+
+
       <SafeAreaView style={styles.overlayContainer} edges={['top', 'bottom']}>
         {/* HEADER */}
         <View style={styles.floatingHeader}>
@@ -390,6 +445,90 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
             </View>
           )}
 
+          {isReticleToolsVisible && (
+            <View style={styles.reticleToolsWrapper}>
+              <Text style={styles.reticleToolsLabel}>
+                Brightness: {reticleBrightness}
+              </Text>
+              <View style={styles.sliderRow}>
+                <Text style={styles.sliderMin}>1</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={1}
+                  maximumValue={10}
+                  step={1}
+                  value={reticleBrightness}
+                  onValueChange={async (v: number) => {
+                    setReticleBrightness(v);
+                    await setHardwareReticleBrightness(v);
+                  }}
+                  minimumTrackTintColor="#00E5FF"
+                  maximumTrackTintColor="rgba(255,255,255,0.2)"
+                  thumbTintColor="#00E5FF"
+                />
+                <Text style={styles.sliderMax}>10</Text>
+              </View>
+
+              <Text style={styles.reticleToolsLabel}>Type</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.typeRow}>
+                  {RETICLE_TYPES.map((t) => (
+                    <TouchableOpacity
+                      key={t.id}
+                      style={[
+                        styles.typePill,
+                        reticleType === t.id && styles.activeTypePill,
+                      ]}
+                      onPress={async () => {
+                        setReticleType(t.id);
+                        await setHardwareReticleType(t.id);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.typeText,
+                          reticleType === t.id && styles.activeTypeText,
+                        ]}
+                      >
+                        {t.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+
+              <Text style={styles.reticleToolsLabel}>Color</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.typeRow}>
+                  {RETICLE_COLORS.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[
+                        styles.colorPill,
+                        reticleColor === c.id && styles.activeColorPill,
+                      ]}
+                      onPress={async () => {
+                        setReticleColor(c.id);
+                        // Send the color name in lowercase as expected by hardware
+                        await setHardwareReticleColor(RETICLE_COLORS[c.id].name.toLowerCase());
+                      }}
+                    >
+                      <View style={[styles.colorSwatch, { backgroundColor: c.color }]} />
+                      <Text
+                        style={[
+                          styles.typeText,
+                          reticleColor === c.id && styles.activeTypeText,
+                        ]}
+                      >
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
           <View style={styles.bottomDock}>
             <View style={styles.dockItem}>
               <TouchableOpacity
@@ -434,10 +573,24 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
 
             <View style={styles.dockItem}>
               <IconButton
-                icon="tune-variant"
-                iconColor="#FFF"
+                icon="crosshairs-gps"
+                iconColor={showReticle ? '#00E5FF' : '#FFF'}
                 size={30}
-                onPress={() => { }}
+                onPress={async () => {
+                  const newState = !showReticle;
+                  setShowReticle(newState);
+                  if (newState) {
+                    setIsReticleToolsVisible(true);
+                    // Enable reticle on hardware with current type
+                    await setHardwareReticleType(reticleType);
+                    await setHardwareReticleBrightness(reticleBrightness);
+                    await setHardwareReticleColor(RETICLE_COLORS[reticleColor].name.toLowerCase());
+                  } else {
+                    setIsReticleToolsVisible(false);
+                    // Disable reticle on hardware by setting type to 0
+                    await setHardwareReticleType(0);
+                  }
+                }}
               />
             </View>
 
@@ -678,5 +831,93 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 30,
     backgroundColor: '#FFF',
+  },
+  reticleToolsWrapper: {
+    width: '94%',
+    backgroundColor: 'rgba(20,20,20,0.9)',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  reticleToolsLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+  },
+  sliderMin: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginRight: 8,
+    width: 16,
+    textAlign: 'center',
+  },
+  sliderMax: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginLeft: 8,
+    width: 20,
+    textAlign: 'center',
+  },
+  typeRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  typePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  activeTypePill: {
+    borderColor: '#00E5FF',
+    backgroundColor: 'rgba(0,229,255,0.12)',
+  },
+  typeText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  activeTypeText: {
+    color: '#00E5FF',
+  },
+  colorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  activeColorPill: {
+    borderColor: '#00E5FF',
+    backgroundColor: 'rgba(0,229,255,0.12)',
+  },
+  colorSwatch: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 8,
   },
 });
