@@ -394,6 +394,26 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
 
           <View style={styles.headerRight}>
             <IconButton
+              icon="crosshairs-gps"
+              iconColor={showReticle ? '#00E5FF' : '#FFF'}
+              size={24}
+              onPress={async () => {
+                const newState = !showReticle;
+                setShowReticle(newState);
+                if (newState) {
+                  setIsReticleToolsVisible(true);
+                  // Enable reticle on hardware with current type
+                  await setHardwareReticleType(reticleType);
+                  await setHardwareReticleBrightness(reticleBrightness);
+                  await setHardwareReticleColor(RETICLE_COLORS[reticleColor].name.toLowerCase());
+                } else {
+                  setIsReticleToolsVisible(false);
+                  // Disable reticle on hardware by setting type to 0
+                  await setHardwareReticleType(0);
+                }
+              }}
+            />
+            <IconButton
               icon="cog"
               iconColor="#FFF"
               size={24}
@@ -572,26 +592,7 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
             </View>
 
             <View style={styles.dockItem}>
-              <IconButton
-                icon="crosshairs-gps"
-                iconColor={showReticle ? '#00E5FF' : '#FFF'}
-                size={30}
-                onPress={async () => {
-                  const newState = !showReticle;
-                  setShowReticle(newState);
-                  if (newState) {
-                    setIsReticleToolsVisible(true);
-                    // Enable reticle on hardware with current type
-                    await setHardwareReticleType(reticleType);
-                    await setHardwareReticleBrightness(reticleBrightness);
-                    await setHardwareReticleColor(RETICLE_COLORS[reticleColor].name.toLowerCase());
-                  } else {
-                    setIsReticleToolsVisible(false);
-                    // Disable reticle on hardware by setting type to 0
-                    await setHardwareReticleType(0);
-                  }
-                }}
-              />
+              {/* Empty space where reticle was */}
             </View>
 
             <View style={styles.dockItem}>
@@ -676,7 +677,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   headerLeft: { width: 50 },
-  headerRight: { width: 50, alignItems: 'flex-end' },
+  headerRight: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'flex-end',
+    width: 100 
+  },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
