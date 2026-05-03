@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import GuideStreamView, { GuideStreamViewRef } from '../components/GuideStreamView';
@@ -432,7 +433,8 @@ async function sendPallet(id: number) {
    SCREEN
 ======================================================== */
 
-const StreamScreen = ({ navigation, isFocused }: any) => {
+const StreamScreen = ({ navigation }: any) => {
+  const isFocused = useIsFocused();
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
   const [activePalette, setActivePalette] = useState(0);
   const [playerKey, setPlayerKey] = useState(1);
@@ -550,17 +552,13 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
   }, [isRecording]);
 
   useEffect(() => {
-    if (!renderPlayer) {
+    if (isFocused) {
+      setPlayerKey(prev => prev + 1);
       setRenderPlayer(true);
-      setRenderPlayer(!renderPlayer)
     } else {
-      const timer = setTimeout(() => {
-        setRenderPlayer(false);
-        setRenderPlayer(!renderPlayer)
-      }, 500);
-      return () => clearTimeout(timer);
+      setRenderPlayer(false);
     }
-  }, []);
+  }, [isFocused]);
 
   const handleChangePalette = async (palette: any) => {
     setActivePalette(palette.uiId);
@@ -586,19 +584,29 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
       const filename = `BullsEye_${Date.now()}.png`;
       const localPath = `${RNFS.DocumentDirectoryPath}/${filename}`;
 
-      // Trigger native snapshot (Same way as video)
+      // 1. Immediate UI update (Tactical Feedback)
+      setLastMedia(`file://${localPath}`);
+
+      // 2. Trigger native snapshot
       guideRef.current?.snapShot(localPath);
 
-      // Wait a moment for the native side to finish writing
+      // 3. Verification loop for Disk I/O
       setTimeout(async () => {
-        if (await RNFS.exists(localPath)) {
+        const exists = await RNFS.exists(localPath);
+        if (exists) {
           console.log('✅ Snapshot Secure:', localPath);
-          setLastMedia(`file://${localPath}`);
           Alert.alert("Sukses", `Foto berhasil disimpan`);
         } else {
-          Alert.alert("GAGAL", "Gagal menyimpan foto. Coba lagi.");
+          // Final retry logic for slow devices
+          setTimeout(async () => {
+            if (await RNFS.exists(localPath)) {
+              Alert.alert("Sukses", `Foto berhasil disimpan`);
+            } else {
+              Alert.alert("GAGAL", "Gagal menyimpan foto ke penyimpanan internal.");
+            }
+          }, 500);
         }
-      }, 1000);
+      }, 1500);
 
     } catch (e: any) {
       console.log('❌ Capture Error:', e);
@@ -633,7 +641,7 @@ const StreamScreen = ({ navigation, isFocused }: any) => {
     const { path } = event.nativeEvent;
     console.log("✅ Record complete:", path);
     setLastMedia(`file://${path}`);
-    Alert.alert("Sukses", `Video berhasil direkam`);
+    Alert.alert("Sukses", `Video berhasil direkam di: ${path}`);
   };
 
   const handleOpenZeroCalibration = async () => {
