@@ -1,4 +1,4 @@
-package com.bullseye.app.sdk
+package com.bullseye.nextapp.sdk
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

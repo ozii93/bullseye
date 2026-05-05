@@ -1,4 +1,4 @@
-package com.bullseye.app.sdk
+package com.bullseye.nextapp.sdk
 
 import android.content.Context
 import android.graphics.Bitmap

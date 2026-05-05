@@ -1,8 +1,8 @@
-package com.bullseye.app
+package com.bullseye.nextapp
 
 import android.app.Application
-import com.bullseye.app.exoplayer.ExoPlayerPackage
-import com.bullseye.app.sdk.GuideStreamPackage
+import com.bullseye.nextapp.exoplayer.ExoPlayerPackage
+import com.bullseye.nextapp.sdk.GuideStreamPackage
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost

@@ -1,4 +1,4 @@
-package com.bullseye.app
+package com.bullseye.nextapp
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

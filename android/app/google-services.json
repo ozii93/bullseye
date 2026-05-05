@@ -41,6 +41,51 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:719621040218:android:dd271d2eaac7a926bad063",
+        "android_client_info": {
+          "package_name": "com.bullseye.nextapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "719621040218-bfmsors9a49qih8cjgmct8s1gdl6smp7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bullseye.nextapp",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "719621040218-vfdecpaa9hf4pckc0cbmtavmvgh0g61u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bullseye.nextapp",
+            "certificate_hash": "f451bfa6cc8a9eab197b154d887421cf2b9efea8"
+          }
+        },
+        {
+          "client_id": "719621040218-8h04igc9o1f573mkfq3vkmvgvmj8tbvc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrQothdG1VNZ3ZE6PNrhK-ot-X7PwsT7o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "719621040218-8h04igc9o1f573mkfq3vkmvgvmj8tbvc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"
