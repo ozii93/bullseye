@@ -17,6 +17,9 @@ end
 target 'NightHawk' do
   config = use_native_modules!
 
+  # FFmpeg for RTSP streaming with VideoToolbox hardware acceleration
+  pod 'ffmpeg-kit-ios-min', '~> 6.0'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

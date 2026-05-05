@@ -14,7 +14,7 @@ import {
 import { useIsFocused } from '@react-navigation/native';
 import { IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import GuideStreamView, { GuideStreamViewRef } from '../components/GuideStreamView';
+import StreamPlayer, { GuideStreamViewRef } from '../components/StreamPlayer';
 import RNFS from 'react-native-fs';
 import { PALETTES as PalettesConstant } from '../core/constant';
 import { createThumbnail } from 'react-native-create-thumbnail';
@@ -784,7 +784,7 @@ const StreamScreen = ({ navigation }: any) => {
       />
 
       {renderPlayer && (
-        <GuideStreamView
+        <StreamPlayer
           ref={guideRef}
           key={playerKey}
           style={styles.videoStream}
