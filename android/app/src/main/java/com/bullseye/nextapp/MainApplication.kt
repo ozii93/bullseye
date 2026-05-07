@@ -1,7 +1,6 @@
 package com.bullseye.nextapp
 
 import android.app.Application
-import com.bullseye.nextapp.exoplayer.ExoPlayerPackage
 import com.bullseye.nextapp.sdk.GuideStreamPackage
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -16,7 +15,6 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          add(ExoPlayerPackage())
           add(GuideStreamPackage())
         },
     )
