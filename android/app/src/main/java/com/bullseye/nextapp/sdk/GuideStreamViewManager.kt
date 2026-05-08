@@ -13,7 +13,8 @@ class GuideStreamViewManager : SimpleViewManager<GuideStreamView>() {
         private const val COMMAND_STOP_RECORD = 2
         private const val COMMAND_SNAPSHOT = 3
     }
-
+    
+    override fun getDelegate() = null
     override fun getName() = "GuideStreamView"
 
     override fun createViewInstance(context: ThemedReactContext): GuideStreamView {

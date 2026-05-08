@@ -1,7 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
-import AndroidGuideStreamView, { GuideStreamViewRef } from '../components/GuideStreamView';
-import IosStreamView from '../components/IosStreamView';
+import GuideStreamView, { GuideStreamViewRef } from './GuideStreamView';
 
 interface StreamPlayerProps {
   rtspType?: number;
@@ -12,10 +10,8 @@ interface StreamPlayerProps {
 
 const StreamPlayer = React.forwardRef<GuideStreamViewRef, StreamPlayerProps>(
   (props, ref) => {
-    if (Platform.OS === 'ios') {
-      return <IosStreamView ref={ref} {...props} />;
-    }
-    return <AndroidGuideStreamView ref={ref} {...props} />;
+    // Tinggal panggil aja, nggak perlu if-else Platform.OS lagi
+    return <GuideStreamView ref={ref} {...props} />;
   },
 );
 
