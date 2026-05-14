@@ -9,6 +9,7 @@ import {
   Alert,
   DeviceEventEmitter,
   Image,
+  ImageBackground,
   Dimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -29,6 +30,7 @@ const RETICLE_COLORS = [
   { id: 1, name: 'White', color: '#FFFFFF' },
   { id: 2, name: 'Green', color: '#00FF00' },
   { id: 3, name: 'Red', color: '#FF0000' },
+  { id: 4, name: 'Cyan', color: '#00FFFF' },
 ];
 
 /* =========================================================
@@ -59,7 +61,7 @@ async function setHardwareReticleType(index: number) {
 }
 
 async function setHardwareReticleColor(index: number) {
-  const colorNames = ['black', 'white', 'green', 'red'];
+  const colorNames = ['black', 'white', 'green', 'red','cyan'];
   const colorName = colorNames[index] || 'green';
   await sendReticleCommand('dashcolor', colorName);
 }
@@ -644,6 +646,10 @@ const StreamScreen = ({ navigation }: any) => {
     setIsZeroCalibrationVisible(true);
     setIsLoadingDistances(true);
 
+    setIsReticleToolsVisible(false);
+    setIsPaletteVisible(false);
+    setShowReticle(false);
+
     // Sync current X/Y coordinates from device paramline
     const hwData = await fetchCurrentCalibrationData();
     if (hwData) {
@@ -810,23 +816,25 @@ const StreamScreen = ({ navigation }: any) => {
               }}
               rippleColor="rgba(255, 255, 255, 0.2)"
             />
+            <IconButton
+              icon="toolbox-outline"
+              iconColor={isToolkitVisible ? '#FF9800' : '#FFF'}
+              size={22}
+              onPress={() => setIsToolkitVisible(!isToolkitVisible)}
+              style={{ marginRight: 8 }}
+            />
           </View>
 
           <View style={styles.headerCenter}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <IconButton
-                icon="toolbox-outline"
-                iconColor={isToolkitVisible ? '#FF9800' : '#FFF'}
-                size={22}
-                onPress={() => setIsToolkitVisible(!isToolkitVisible)}
-                style={{ marginRight: 8 }}
-              />
-              <View style={[styles.statusBadge, isRecording && { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
-                <View style={[styles.liveDot, isRecording && { backgroundColor: '#FF3B30' }]} />
-                <Text style={[styles.statusText, isRecording && { color: '#FF3B30' }]}>
-                  {isRecording ? 'REC' : 'LIVE'}
-                </Text>
-              </View>
+              {isRecording && (
+                <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
+                  <View style={[styles.liveDot, { backgroundColor: '#FF3B30' }]} />
+                  <Text style={[styles.statusText, { color: '#FF3B30' }]}>
+                    REC
+                  </Text>
+                </View>
+              )}
             </View>
 
             {isRecording && (
@@ -843,6 +851,9 @@ const StreamScreen = ({ navigation }: any) => {
                 const newState = !showReticle;
                 setShowReticle(newState);
                 if (newState) {
+                  setIsPaletteVisible(false);
+                  setIsZeroCalibrationVisible(false);
+
                   setIsReticleToolsVisible(true);
                   // Enable reticle on hardware with current type
                   await setHardwareReticleType(reticleType);
@@ -898,20 +909,25 @@ const StreamScreen = ({ navigation }: any) => {
                       ]}
                       onPress={() => handleChangePalette(item)}
                     >
-                      <View
-                        style={[
-                          styles.colorDot,
-                          { backgroundColor: item.color },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.paletteText,
-                          isActive && styles.activePaletteText,
-                        ]}
+                      <ImageBackground
+                        source={item.backgroundImage}
+                        resizeMode="cover"
+                        style={styles.palettePreview}
+                        imageStyle={styles.palettePreviewImage}
                       >
-                        {item.name}
-                      </Text>
+                        <View style={styles.paletteShade} />
+                        <View style={styles.paletteLabelBar}>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.paletteText,
+                              isActive && styles.activePaletteText,
+                            ]}
+                          >
+                            {item.name}
+                          </Text>
+                        </View>
+                      </ImageBackground>
                     </TouchableOpacity>
                   );
                 })}
@@ -1074,7 +1090,7 @@ const StreamScreen = ({ navigation }: any) => {
                       style={[styles.typePill, !isFrozen && styles.activeTypePill]}
                       onPress={() => isFrozen && handleFreezeToggle()}
                     >
-                      <Text style={[styles.typeText, !isFrozen && styles.activeTypeText]}>Live</Text>
+                      {/* <Text style={[styles.typeText, !isFrozen && styles.activeTypeText]}>Live</Text> */}
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.typePill, isFrozen && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' }]}
@@ -1307,6 +1323,11 @@ const StreamScreen = ({ navigation }: any) => {
                 size={30}
                 onPress={async () => {
                   const opening = !isImageAdjustVisible;
+                  setIsReticleToolsVisible(false);
+                  setIsZeroCalibrationVisible(false);
+                  setShowReticle(false);
+                  setIsPaletteVisible(false)
+
                   setIsImageAdjustVisible(opening);
                   if (opening) {
                     const hw = await fetchCurrentCalibrationData();
@@ -1325,7 +1346,14 @@ const StreamScreen = ({ navigation }: any) => {
                 icon="palette"
                 iconColor={isPaletteVisible ? '#00E5FF' : '#FFF'}
                 size={30}
-                onPress={() => setIsPaletteVisible(!isPaletteVisible)}
+                onPress={() => {
+                  setIsReticleToolsVisible(false);
+                  setIsZeroCalibrationVisible(false);
+                  setShowReticle(false);
+                  setIsImageAdjustVisible(false);
+
+                  setIsPaletteVisible(!isPaletteVisible)
+                }}
               />
             </View>
           </View>
@@ -1397,11 +1425,11 @@ const styles = StyleSheet.create({
   floatingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 10,
     marginTop: 20,
   },
-  headerLeft: { width: 50 },
+  headerLeft: { flexDirection: 'row', width: 50 },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1486,40 +1514,52 @@ const styles = StyleSheet.create({
   },
   paletteWrapper: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   paletteScroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
   },
   palettePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(28,28,30,0.8)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginRight: 12,
-    borderRadius: 20,
+    width: 86,
+    height: 64,
+    backgroundColor: 'rgba(18,18,20,0.92)',
+    marginRight: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    overflow: 'hidden',
   },
   activePalettePill: {
     borderColor: '#00E5FF',
-    backgroundColor: 'rgba(0,229,255,0.1)',
+    backgroundColor: 'rgba(0,229,255,0.08)',
   },
-  colorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
+  palettePreview: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: '#111',
+  },
+  palettePreviewImage: {
+    borderRadius: 7,
+  },
+  paletteShade: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+  },
+  paletteLabelBar: {
+    minHeight: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(0,0,0,0.72)',
   },
   paletteText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 13,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 10,
+    fontWeight: '700',
   },
   activePaletteText: {
     color: '#00E5FF',
-    fontWeight: 'bold',
   },
   bottomDock: {
     flexDirection: 'row',

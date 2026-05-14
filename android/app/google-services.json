@@ -59,6 +59,14 @@
           }
         },
         {
+          "client_id": "719621040218-riqubrlbvgp1s3oc29o38c3a8dkl85i5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bullseye.nextapp",
+            "certificate_hash": "18ada845fc546bc1deb5ccc686b1f478a2a38e31"
+          }
+        },
+        {
           "client_id": "719621040218-vfdecpaa9hf4pckc0cbmtavmvgh0g61u.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

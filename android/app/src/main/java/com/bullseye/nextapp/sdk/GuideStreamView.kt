@@ -3,7 +3,9 @@ package com.bullseye.nextapp.sdk
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.SurfaceTexture
 import android.os.Handler
 import android.os.HandlerThread
@@ -42,6 +44,7 @@ class GuideStreamView(context: Context) : TextureView(context), TextureView.Surf
     private val frameLock = Any()
     private var renderThread: HandlerThread? = null
     private var renderHandler: Handler? = null
+    private val videoDstRect = RectF()
 
     init {
         surfaceTextureListener = this
@@ -244,13 +247,30 @@ class GuideStreamView(context: Context) : TextureView(context), TextureView.Surf
 
             val canvas = lockCanvas() ?: return
             try {
-                canvas.drawBitmap(bmp, 0f, 0f, paint)
+                canvas.drawColor(Color.BLACK)
+                computeAspectFitRect(canvas.width, canvas.height, w, h, videoDstRect)
+                canvas.drawBitmap(bmp, null, videoDstRect, paint)
             } finally {
                 unlockCanvasAndPost(canvas)
             }
         } catch (e: Exception) {
             Log.e(TAG, "renderFrame error: ${e.message}")
         }
+    }
+
+    private fun computeAspectFitRect(viewWidth: Int, viewHeight: Int, sourceWidth: Int, sourceHeight: Int, outRect: RectF) {
+        if (viewWidth <= 0 || viewHeight <= 0 || sourceWidth <= 0 || sourceHeight <= 0) {
+            outRect.set(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
+            return
+        }
+
+        // Keep the stream's source aspect ratio and fit it fully inside the React Native container.
+        val scale = minOf(viewWidth.toFloat() / sourceWidth.toFloat(), viewHeight.toFloat() / sourceHeight.toFloat())
+        val fittedWidth = sourceWidth * scale
+        val fittedHeight = sourceHeight * scale
+        val left = (viewWidth - fittedWidth) / 2f
+        val top = (viewHeight - fittedHeight) / 2f
+        outRect.set(left, top, left + fittedWidth, top + fittedHeight)
     }
 
     private fun emitEvent(name: String, data: WritableMap? = null) {

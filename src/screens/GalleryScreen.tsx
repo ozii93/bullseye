@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons'
 import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
 
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 3;
@@ -28,6 +29,48 @@ interface DeviceFile {
   size: string;
 }
 
+const getFileNameFromUri = (uri: string) => decodeURIComponent(uri.split('/').pop() || `BullsEye_${Date.now()}`);
+const getPathFromFileUri = (uri: string) => decodeURIComponent(uri.replace('file://', '').split('?')[0]);
+
+const getMimeType = (name: string, isVideo: boolean) => {
+  const lower = name.toLowerCase();
+
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.ts')) return 'video/mp2t';
+
+  return isVideo ? 'video/*' : 'image/*';
+};
+
+const getShareType = (items: { name: string; isVideo: boolean }[]) => {
+  if (items.length === 0) return '*/*';
+
+  const hasImage = items.some((item) => !item.isVideo);
+  const hasVideo = items.some((item) => item.isVideo);
+
+  if (hasImage && hasVideo) return '*/*';
+  return getMimeType(items[0].name, items[0].isVideo);
+};
+
+const getDeviceFileUrl = (file: DeviceFile) => {
+  const filename = encodeURIComponent(file.name);
+
+  return file.type === 'video'
+    ? `http://192.168.42.1/api/v1/files/videos/${filename}`
+    : `http://192.168.42.1/api/v1/files/download/${filename}`;
+};
+
+const mapDeviceFileToViewerItem = (file: DeviceFile) => ({
+  uri: getDeviceFileUrl(file),
+  name: file.name,
+  path: '',
+  isVideo: file.type === 'video',
+  isImage: file.type !== 'video',
+  date: null,
+  source: 'device',
+});
+
 const GalleryScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'local' | 'device'>('local');
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
@@ -35,6 +78,19 @@ const GalleryScreen = ({ navigation }: any) => {
   const [isLoadingCloud, setIsLoadingCloud] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedLocalUris, setSelectedLocalUris] = useState<string[]>([]);
+  const [selectedDeviceNames, setSelectedDeviceNames] = useState<string[]>([]);
+
+  const selectedCount = activeTab === 'local'
+    ? selectedLocalUris.length
+    : selectedDeviceNames.length;
+
+  const clearSelection = useCallback(() => {
+    setIsSelecting(false);
+    setSelectedLocalUris([]);
+    setSelectedDeviceNames([]);
+  }, []);
 
   const loadMedia = useCallback(async () => {
     try {
@@ -55,7 +111,9 @@ const GalleryScreen = ({ navigation }: any) => {
       const media = allFiles.filter((f: any) =>
         f.name.endsWith('.png') ||
         f.name.endsWith('.jpg') ||
-        f.name.endsWith('.mp4')
+        f.name.endsWith('.jpeg') ||
+        f.name.endsWith('.mp4') ||
+        f.name.endsWith('.ts')
       );
 
       media.sort((a: any, b: any) => {
@@ -103,6 +161,18 @@ const GalleryScreen = ({ navigation }: any) => {
   };
 
   const handleDeviceFilePress = async (file: DeviceFile) => {
+    if (isSelecting) {
+      toggleDeviceSelection(file.name);
+      return;
+    }
+
+    navigation.navigate('RecentMedia', {
+      uri: getDeviceFileUrl(file),
+      mediaItems: cloudFiles.map(mapDeviceFileToViewerItem),
+      source: 'device',
+    });
+    return;
+
     try {
       const filename = file.name;
       const localPath = `${RNFS.CachesDirectoryPath}/${filename}`;
@@ -120,16 +190,161 @@ const GalleryScreen = ({ navigation }: any) => {
     }
   };
 
+  const toggleLocalSelection = (uri: string) => {
+    setIsSelecting(true);
+    setSelectedLocalUris((current) =>
+      current.includes(uri)
+        ? current.filter((selected) => selected !== uri)
+        : [...current, uri],
+    );
+  };
+
+  const toggleDeviceSelection = (name: string) => {
+    setIsSelecting(true);
+    setSelectedDeviceNames((current) =>
+      current.includes(name)
+        ? current.filter((selected) => selected !== name)
+        : [...current, name],
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (activeTab === 'local') {
+      setSelectedLocalUris(mediaFiles);
+    } else {
+      setSelectedDeviceNames(cloudFiles.map((file) => file.name));
+    }
+    setIsSelecting(true);
+  };
+
+  const copyLocalToShareCache = async (uri: string) => {
+    const sourcePath = getPathFromFileUri(uri);
+    const name = getFileNameFromUri(uri);
+    const sharePath = `${RNFS.CachesDirectoryPath}/${name}`;
+
+    if (sourcePath !== sharePath) {
+      await RNFS.unlink(sharePath).catch(() => {});
+      await RNFS.copyFile(sourcePath, sharePath);
+    }
+
+    return {
+      url: `file://${sharePath}`,
+      name,
+      isVideo: name.toLowerCase().endsWith('.mp4') || name.toLowerCase().endsWith('.ts'),
+    };
+  };
+
+  const downloadDeviceToShareCache = async (file: DeviceFile) => {
+    const localPath = `${RNFS.CachesDirectoryPath}/${file.name}`;
+    const exists = await RNFS.exists(localPath);
+
+    if (!exists) {
+      const url = getDeviceFileUrl(file);
+      await RNFS.downloadFile({ fromUrl: url, toFile: localPath }).promise;
+    }
+
+    return {
+      url: `file://${localPath}`,
+      name: file.name,
+      isVideo: file.type === 'video',
+    };
+  };
+
+  const handleShareSelected = async () => {
+    if (selectedCount === 0) return;
+
+    try {
+      const shareItems = activeTab === 'local'
+        ? await Promise.all(selectedLocalUris.map(copyLocalToShareCache))
+        : await Promise.all(
+          cloudFiles
+            .filter((file) => selectedDeviceNames.includes(file.name))
+            .map(downloadDeviceToShareCache),
+        );
+
+      await Share.open({
+        urls: shareItems.map((item) => item.url),
+        filenames: shareItems.map((item) => item.name),
+        type: getShareType(shareItems),
+        failOnCancel: false,
+      });
+    } catch (error: any) {
+      if (error?.message !== 'User did not share') {
+        console.log('Share selected error:', error);
+        Alert.alert('Error', 'Gagal membagikan media terpilih');
+      }
+    }
+  };
+
+  const deleteRemoteFile = async (file: DeviceFile) => {
+    const response = await fetch(`http://192.168.42.1/api/v1/files/${encodeURIComponent(file.name)}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Delete failed: ${response.status}`);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedCount === 0) return;
+
+    Alert.alert(
+      'Hapus Media',
+      `Hapus ${selectedCount} media terpilih?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (activeTab === 'local') {
+                await Promise.all(
+                  selectedLocalUris.map((uri) => RNFS.unlink(getPathFromFileUri(uri)).catch(() => {})),
+                );
+                await loadMedia();
+              } else {
+                await Promise.all(
+                  cloudFiles
+                    .filter((file) => selectedDeviceNames.includes(file.name))
+                    .map(deleteRemoteFile),
+                );
+                await fetchCloudFiles();
+              }
+
+              clearSelection();
+            } catch (error) {
+              console.log('Delete selected error:', error);
+              Alert.alert('Error', activeTab === 'device'
+                ? 'Gagal menghapus file dari remote device'
+                : 'Gagal menghapus media terpilih');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const renderSelectionBadge = (selected: boolean) => (
+    <View style={[styles.selectionBadge, selected && styles.selectionBadgeActive]}>
+      {selected && <MaterialDesignIcons name="check" size={18} color="#05070a" />}
+    </View>
+  );
+
   const renderMediaItem = ({ item }: { item: string }) => {
-    const isVideo = item.endsWith('.mp4');
+    const isVideo = item.endsWith('.mp4') || item.endsWith('.ts');
+    const isSelected = selectedLocalUris.includes(item);
     return (
       <TouchableOpacity style={styles.mediaItem} activeOpacity={0.8}
-        onPress={() => navigation.navigate('RecentMedia', { uri: item })}>
-        <Surface style={styles.thumbnailFrame} elevation={2}>
+        onLongPress={() => toggleLocalSelection(item)}
+        onPress={() => isSelecting ? toggleLocalSelection(item) : navigation.navigate('RecentMedia', { uri: item })}>
+        <Surface style={[styles.thumbnailFrame, isSelected && styles.selectedFrame]} elevation={2}>
           <Image source={{ uri: item }} style={styles.thumbnail} />
           {isVideo && <View style={styles.videoOverlay}>
             <MaterialDesignIcons name="play-circle-outline" size={28} color="#FFF" />
           </View>}
+          {isSelecting && renderSelectionBadge(isSelected)}
         </Surface>
       </TouchableOpacity>
     );
@@ -137,17 +352,21 @@ const GalleryScreen = ({ navigation }: any) => {
 
   const renderDeviceItem = ({ item }: { item: DeviceFile }) => {
     const isVideo = item.type === 'video';
+    const isSelected = selectedDeviceNames.includes(item.name);
+    const filename = encodeURIComponent(item.name);
     const thumbUrl = isVideo
-      ? `http://192.168.42.1/api/v1/files/videos/${item.name}/thumb/1`
-      : `http://192.168.42.1/api/v1/files/download/${item.name}`;
+      ? `http://192.168.42.1/api/v1/files/videos/${filename}/thumb/1`
+      : getDeviceFileUrl(item);
     return (
       <TouchableOpacity style={styles.mediaItem} activeOpacity={0.8}
+        onLongPress={() => toggleDeviceSelection(item.name)}
         onPress={() => handleDeviceFilePress(item)}>
-        <Surface style={styles.thumbnailFrame} elevation={2}>
+        <Surface style={[styles.thumbnailFrame, isSelected && styles.selectedFrame]} elevation={2}>
           <Image source={{ uri: thumbUrl }} style={styles.thumbnail} />
           {isVideo && <View style={styles.videoOverlay}>
             <MaterialDesignIcons name="play-circle-outline" size={28} color="#FFF" />
           </View>}
+          {isSelecting && renderSelectionBadge(isSelected)}
         </Surface>
       </TouchableOpacity>
     );
@@ -157,6 +376,7 @@ const GalleryScreen = ({ navigation }: any) => {
     if (activeTab === 'device') {
       fetchCloudFiles();
     }
+    clearSelection();
   }, [activeTab]);
 
   return (
@@ -169,19 +389,46 @@ const GalleryScreen = ({ navigation }: any) => {
           icon="chevron-left" 
           iconColor="#FFF" 
           size={32}
-          onPress={() => navigation.goBack()} 
+          onPress={() => isSelecting ? clearSelection() : navigation.goBack()} 
         />
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>INTELLIGENCE ARCHIVE</Text>
-          <Text style={styles.subtitle}>TACTICAL MEDIA STORAGE</Text>
+          <Text style={styles.title}>{isSelecting ? `${selectedCount} SELECTED` : 'INTELLIGENCE ARCHIVE'}</Text>
+          <Text style={styles.subtitle}>{isSelecting ? 'LONG PRESS MEDIA TO SELECT' : 'TACTICAL MEDIA STORAGE'}</Text>
         </View>
         <IconButton 
-          icon="shield-search" 
-          iconColor="#D32F2F" 
+          icon={isSelecting ? 'close' : 'shield-search'} 
+          iconColor={isSelecting ? '#FFF' : '#D32F2F'} 
           size={24} 
-          onPress={() => {}} 
+          onPress={isSelecting ? clearSelection : () => {}} 
         />
       </View>
+
+      {isSelecting && (
+        <View style={styles.selectionToolbar}>
+          <TouchableOpacity style={styles.selectionAction} onPress={handleSelectAll}>
+            <MaterialDesignIcons name="select-all" size={20} color="#FFF" />
+            <Text style={styles.selectionActionText}>SELECT ALL</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.selectionAction} onPress={clearSelection}>
+            <MaterialDesignIcons name="close-circle-outline" size={20} color="#FFF" />
+            <Text style={styles.selectionActionText}>CANCEL</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.selectionIconButton, selectedCount === 0 && styles.disabledAction]}
+            disabled={selectedCount === 0}
+            onPress={handleShareSelected}
+          >
+            <MaterialDesignIcons name="share-variant" size={22} color="#FFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.selectionIconButton, styles.deleteAction, selectedCount === 0 && styles.disabledAction]}
+            disabled={selectedCount === 0}
+            onPress={handleDeleteSelected}
+          >
+            <MaterialDesignIcons name="trash-can-outline" size={22} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Elite Tabs */}
       <View style={styles.tabWrapper}>
@@ -333,6 +580,51 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  selectionToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  selectionAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginRight: 4,
+  },
+  selectionActionText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginLeft: 6,
+  },
+  selectionIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 'auto',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  deleteAction: {
+    marginLeft: 8,
+    backgroundColor: 'rgba(211,47,47,0.18)',
+    borderColor: 'rgba(211,47,47,0.35)',
+  },
+  disabledAction: {
+    opacity: 0.35,
+  },
   listContent: {
     paddingBottom: 40,
   },
@@ -348,9 +640,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },
+  selectedFrame: {
+    borderColor: '#D32F2F',
+    borderWidth: 2,
+  },
   thumbnail: {
     flex: 1,
     backgroundColor: '#0c1018',
+  },
+  selectionBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  selectionBadgeActive: {
+    backgroundColor: '#FFF',
+    borderColor: '#FFF',
   },
   videoOverlay: {
     ...StyleSheet.absoluteFill,

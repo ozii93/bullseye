@@ -82,8 +82,8 @@ android {
         applicationId "com.bullseye.nextapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1001
-        versionName "1.0.0"
+        versionCode 100010
+        versionName "1.0.1"
     }
     signingConfigs {
         release {

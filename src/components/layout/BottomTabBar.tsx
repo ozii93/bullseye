@@ -27,7 +27,6 @@ const CustomHeader = () => (
           width: 110,
           height: 30,
           resizeMode: 'contain',
-          marginLeft: 15,
         }}
       />
     </View>

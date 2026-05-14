@@ -1,11 +1,11 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import {
-  requireNativeComponent,
   StyleProp,
   ViewStyle,
   NativeModules,
   findNodeHandle,
 } from 'react-native';
+import NativeGuideStreamView from './NativeGuideStreamView';
 
 interface IosStreamViewProps {
   rtspType?: number;
@@ -20,7 +20,6 @@ export interface GuideStreamViewRef {
   snapShot: (path: string) => void;
 }
 
-const RCTIosStreamView = requireNativeComponent<IosStreamViewProps>('GuideStreamView');
 const { GuideStreamCommands } = NativeModules;
 
 const IosStreamView = forwardRef<GuideStreamViewRef, IosStreamViewProps>(
@@ -49,7 +48,7 @@ const IosStreamView = forwardRef<GuideStreamViewRef, IosStreamViewProps>(
     }));
 
     return (
-      <RCTIosStreamView
+      <NativeGuideStreamView
         ref={nativeRef}
         rtspType={rtspType}
         style={style}

@@ -1,7 +1,6 @@
 package com.bullseye.nextapp.sdk
 
 import com.facebook.react.bridge.ReadableArray
-import com.facebook.react.common.MapBuilder
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.annotations.ReactProp
@@ -14,7 +13,6 @@ class GuideStreamViewManager : SimpleViewManager<GuideStreamView>() {
         private const val COMMAND_SNAPSHOT = 3
     }
     
-    override fun getDelegate() = null
     override fun getName() = "GuideStreamView"
 
     override fun createViewInstance(context: ThemedReactContext): GuideStreamView {

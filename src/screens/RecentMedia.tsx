@@ -21,14 +21,29 @@ const { width } = Dimensions.get('window');
 type MediaItem = {
   uri: string;
   name: string;
-  path: string;
+  path?: string;
   isVideo: boolean;
   isImage: boolean;
   date: Date | null;
+  source?: 'local' | 'device';
 };
 
+const getShareMimeType = (item: MediaItem) => {
+  const lower = item.name.toLowerCase();
+
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.ts')) return 'video/mp2t';
+
+  return item.isVideo ? 'video/*' : 'image/*';
+};
+
+const getDeviceDeleteUrl = (item: MediaItem) =>
+  `http://192.168.42.1/api/v1/files/${encodeURIComponent(item.name)}`;
+
 const RecentMedia = ({ route, navigation }: any) => {
-  const { uri } = route.params || {};
+  const { uri, mediaItems } = route.params || {};
 
   const [mediaFiles, setMediaFiles] = useState<MediaItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -37,10 +52,29 @@ const RecentMedia = ({ route, navigation }: any) => {
 
   useEffect(() => {
     loadAllMedia();
-  }, []);
+  }, [route.params]);
 
   const loadAllMedia = async (): Promise<void> => {
     try {
+      if (Array.isArray(mediaItems) && mediaItems.length > 0) {
+        setMediaFiles(mediaItems);
+
+        const index = uri
+          ? mediaItems.findIndex((item: MediaItem) => item.uri === uri)
+          : 0;
+        const nextIndex = index !== -1 ? index : 0;
+
+        setCurrentIndex(nextIndex);
+
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: nextIndex,
+            animated: false,
+          });
+        }, 300);
+        return;
+      }
+
       const bullsEyePath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
       
       const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath).catch(() => []);
@@ -82,6 +116,7 @@ const RecentMedia = ({ route, navigation }: any) => {
             lower.endsWith('.jpg') ||
             lower.endsWith('.jpeg'),
           date: file.mtime ?? null,
+          source: 'local',
         };
       });
 
@@ -122,15 +157,54 @@ const RecentMedia = ({ route, navigation }: any) => {
   const activeItem =
     mediaFiles[currentIndex] || null;
 
+  const ensureLocalActionFile = async (item: MediaItem) => {
+    if (item.source === 'device' || !item.path) {
+      const localPath = `${RNFS.CachesDirectoryPath}/${item.name}`;
+      const exists = await RNFS.exists(localPath);
+
+      if (!exists) {
+        await RNFS.downloadFile({
+          fromUrl: item.uri,
+          toFile: localPath,
+        }).promise;
+      }
+
+      return localPath;
+    }
+
+    return item.path;
+  };
+
   const handleShare = async () => {
+    console.log('📤 Sharing:', activeItem?.uri);
     if (!activeItem) return;
 
     try {
+      const localPath = await ensureLocalActionFile(activeItem);
+      const exists = await RNFS.exists(localPath);
+
+      if (!exists) {
+        Alert.alert(
+          'Gagal',
+          'File media tidak ditemukan',
+        );
+        return;
+      }
+
+      const sharePath = `${RNFS.CachesDirectoryPath}/${activeItem.name}`;
+      if (localPath !== sharePath) {
+        await RNFS.unlink(sharePath).catch(() => {});
+        await RNFS.copyFile(localPath, sharePath);
+      }
+
+      const shareUrl = `file://${sharePath}`;
+      console.log('Sharing:', shareUrl);
+
       await Share.open({
-        url: activeItem.uri,
-        type: activeItem.isVideo
-          ? 'video/*'
-          : 'image/*',
+        url: shareUrl,
+        type: getShareMimeType(activeItem),
+        filename: activeItem.name,
+        failOnCancel: false,
       });
     } catch (error: any) {
       if (
@@ -146,7 +220,9 @@ const RecentMedia = ({ route, navigation }: any) => {
     if (!activeItem) return;
 
     try {
-      await CameraRoll.save(activeItem.uri, {
+      const localPath = await ensureLocalActionFile(activeItem);
+
+      await CameraRoll.save(`file://${localPath}`, {
         type: activeItem.isVideo
           ? 'video'
           : 'photo',
@@ -181,9 +257,19 @@ const RecentMedia = ({ route, navigation }: any) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await RNFS.unlink(
-                activeItem.path,
-              );
+              if (activeItem.source === 'device') {
+                const response = await fetch(getDeviceDeleteUrl(activeItem), {
+                  method: 'DELETE',
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Delete failed: ${response.status}`);
+                }
+              } else if (activeItem.path) {
+                await RNFS.unlink(
+                  activeItem.path,
+                );
+              }
 
               const updated =
                 mediaFiles.filter(
@@ -354,9 +440,7 @@ const RecentMedia = ({ route, navigation }: any) => {
           icon="share-variant"
           iconColor="#A0A0A5"
           size={26}
-          onPress={
-            handleShare
-          }
+          onPress={() => handleShare()}
         />
 
         <View
@@ -408,6 +492,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
+    marginLeft: '10%',
   },
   counterText: {
     color: '#FFF',
