@@ -321,6 +321,144 @@ async function sendEnhancement(value: number) {
 }
 
 /* =========================================================
+   DEVICE SETTINGS API HELPERS
+======================================================== */
+
+const DS_BASE = 'http://192.168.42.1/api/v1';
+
+async function dsGet(endpoint: string): Promise<any> {
+  const url = `${DS_BASE}${endpoint}`;
+  try {
+    const response = await fetch(url, { method: 'GET' });
+    if (response.ok) {
+      const text = await response.text();
+      if (text) return JSON.parse(text);
+    }
+  } catch (e) {
+    console.warn(`⚠️ DS GET ${endpoint}:`, e);
+  }
+  return null;
+}
+
+async function dsPut(endpoint: string, value: string): Promise<boolean> {
+  const url = `${DS_BASE}${endpoint}`;
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    console.log(`✅ DS PUT ${endpoint} = ${value} (${response.status})`);
+    return response.ok;
+  } catch (e) {
+    console.error(`❌ DS PUT ${endpoint}:`, e);
+    return false;
+  }
+}
+
+async function fetchCompensationMode(): Promise<string> {
+  const data = await dsGet('/camera/compensation');
+  return data?.value || 'auto';
+}
+
+async function setCompensationMode(mode: string): Promise<boolean> {
+  return dsPut('/camera/compensation', mode);
+}
+
+async function fetchSmartSleep(): Promise<string> {
+  const data = await dsGet('/misc/intelligent_sleep');
+  return data?.value || 'off';
+}
+
+async function setSmartSleep(value: string): Promise<boolean> {
+  return dsPut('/misc/intelligent_sleep', value);
+}
+
+async function fetchSleepShutdown(): Promise<{ sleep: string; shutdown: string }> {
+  const data = await dsGet('/misc/sleepshutdown');
+  return {
+    sleep: data?.sleep || 'off',
+    shutdown: data?.shutdown || 'off',
+  };
+}
+
+async function setSleepShutdown(sleep: string, shutdown: string): Promise<boolean> {
+  const url = `${DS_BASE}/misc/sleepshutdown`;
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sleep, shutdown }),
+    });
+    console.log(`✅ DS PUT /misc/sleepshutdown sleep=${sleep} shutdown=${shutdown} (${response.status})`);
+    return response.ok;
+  } catch (e) {
+    console.error('❌ DS PUT sleepshutdown:', e);
+    return false;
+  }
+}
+
+async function fetchTimedShutdownMenu(): Promise<string> {
+  const data = await dsGet('/misc/auto_close_menu');
+  return data?.value || 'off';
+}
+
+async function setTimedShutdownMenu(value: string): Promise<boolean> {
+  return dsPut('/misc/auto_close_menu', value);
+}
+
+async function syncTimeToDevice(): Promise<boolean> {
+  const timestamp = Math.floor(Date.now() / 1000);
+  return dsPut('/misc/time', String(timestamp));
+}
+
+async function fetchLimitedTimeRecording(): Promise<string> {
+  const data = await dsGet('/peripheral/limit_record');
+  return data?.value || 'off';
+}
+
+async function setLimitedTimeRecording(value: string): Promise<boolean> {
+  return dsPut('/peripheral/limit_record', value);
+}
+
+async function fetchAudioStatus(): Promise<string> {
+  const data = await dsGet('/peripheral/audio_status');
+  return data?.value || 'off';
+}
+
+async function setAudioStatus(value: string): Promise<boolean> {
+  return dsPut('/peripheral/audio_status', value);
+}
+
+async function loadAllDeviceSettings(): Promise<{
+  compensation: string;
+  smartSleep: string;
+  sleepVal: string;
+  shutdown: string;
+  shutdownMenu: string;
+  limitedRecord: string;
+  audio: string;
+}> {
+  const [comp, ss, ssData, menu, lr, audio] = await Promise.all([
+    fetchCompensationMode(),
+    fetchSmartSleep(),
+    fetchSleepShutdown(),
+    fetchTimedShutdownMenu(),
+    fetchLimitedTimeRecording(),
+    fetchAudioStatus(),
+  ]);
+  return {
+    compensation: comp,
+    smartSleep: ss,
+    sleepVal: ssData.sleep,
+    shutdown: ssData.shutdown,
+    shutdownMenu: menu,
+    limitedRecord: lr,
+    audio,
+  };
+}
+
+/* =========================================================
    CONFIG
 ======================================================== */
 
@@ -485,6 +623,18 @@ const StreamScreen = ({ navigation }: any) => {
 
   // Image Adjustment panel
   const [isImageAdjustVisible, setIsImageAdjustVisible] = useState(false);
+
+  // Device Settings state
+  const [isDeviceSettingsVisible, setIsDeviceSettingsVisible] = useState(false);
+  const [dsCompensation, setDsCompensation] = useState('auto');
+  const [dsSmartSleep, setDsSmartSleep] = useState('off');
+  const [dsAutoSleepVal, setDsAutoSleepVal] = useState('off');
+  const [dsTimedShutdown, setDsTimedShutdown] = useState('off');
+  const [dsShutdownMenu, setDsShutdownMenu] = useState('off');
+  const [dsTimeCorrection, setDsTimeCorrection] = useState(false);
+  const [dsLimitedRecord, setDsLimitedRecord] = useState('off');
+  const [dsAudio, setDsAudio] = useState('off');
+  const [dsLoading, setDsLoading] = useState(false);
 
   useEffect(() => {
     console.log('📂 STORAGE PATH:', RNFS.DocumentDirectoryPath);
@@ -880,13 +1030,232 @@ const StreamScreen = ({ navigation }: any) => {
             />
             <IconButton
               icon="cog"
-              iconColor="#FFF"
+              iconColor={isDeviceSettingsVisible ? '#00E5FF' : '#FFF'}
               size={24}
-              onPress={() => { }}
+              onPress={async () => {
+                const opening = !isDeviceSettingsVisible;
+                setIsDeviceSettingsVisible(opening);
+                if (opening) {
+                  // Close other panels
+                  setIsReticleToolsVisible(false);
+                  setIsZeroCalibrationVisible(false);
+                  setIsPaletteVisible(false);
+                  setIsImageAdjustVisible(false);
+                  setIsToolkitVisible(false);
+                  setShowReticle(false);
+                  // Load current device settings
+                  setDsLoading(true);
+                  const settings = await loadAllDeviceSettings();
+                  setDsCompensation(settings.compensation);
+                  setDsSmartSleep(settings.smartSleep);
+                  setDsAutoSleepVal(settings.sleepVal);
+                  setDsTimedShutdown(settings.shutdown);
+                  setDsShutdownMenu(settings.shutdownMenu);
+                  setDsLimitedRecord(settings.limitedRecord);
+                  setDsAudio(settings.audio);
+                  setDsLoading(false);
+                }
+              }}
             />
           </View>
         </View>
 
+        {/* DEVICE SETTINGS PANEL */}
+        {isDeviceSettingsVisible && (
+          <View style={styles.deviceSettingsOverlay}>
+            <ScrollView
+              style={styles.deviceSettingsScroll}
+              contentContainerStyle={styles.deviceSettingsContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.deviceSettingsHeader}>
+                <Text style={styles.deviceSettingsTitle}>DEVICE SETTINGS</Text>
+                <TouchableOpacity
+                  onPress={() => setIsDeviceSettingsVisible(false)}
+                  style={styles.zeroCalBackBtn}
+                >
+                  <Text style={styles.zeroCalBackText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {dsLoading ? (
+                <Text style={styles.dsLoadingText}>Loading settings...</Text>
+              ) : (
+                <>
+                  {/* GENERAL SETTINGS */}
+                  <Text style={styles.dsSectionTitle}>GENERAL SETTINGS</Text>
+
+                  {/* Compensation Mode */}
+                  <Text style={styles.dsLabel}>Compensation Mode</Text>
+                  <View style={styles.typeRow}>
+                    {['auto', 'shutter', 'scene'].map((mode) => (
+                      <TouchableOpacity
+                        key={mode}
+                        style={[styles.typePill, dsCompensation === mode && styles.activeTypePill]}
+                        onPress={async () => {
+                          setDsCompensation(mode);
+                          await setCompensationMode(mode);
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsCompensation === mode && styles.activeTypeText]}>
+                          {mode === 'auto' ? 'Auto' : mode === 'shutter' ? 'Shutter' : 'Scene'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Smart Sleep */}
+                  <Text style={styles.dsLabel}>Smart Sleep</Text>
+                  <View style={styles.typeRow}>
+                    {[
+                      { value: 'off', label: 'OFF' },
+                      { value: 'on', label: 'ON' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.typePill, dsSmartSleep === opt.value && styles.activeTypePill]}
+                        onPress={async () => {
+                          setDsSmartSleep(opt.value);
+                          await setSmartSleep(opt.value);
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsSmartSleep === opt.value && styles.activeTypeText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Timed Shutdown */}
+                  <Text style={styles.dsLabel}>Timed Shutdown</Text>
+                  <View style={styles.typeRow}>
+                    {[
+                      { value: 'off', label: 'OFF' },
+                      { value: '15', label: '15min' },
+                      { value: '30', label: '30min' },
+                      { value: '60', label: '60min' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.typePill, dsTimedShutdown === opt.value && styles.activeTypePill]}
+                        onPress={async () => {
+                          setDsTimedShutdown(opt.value);
+                          await setSleepShutdown(dsAutoSleepVal, opt.value);
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsTimedShutdown === opt.value && styles.activeTypeText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Time Shutdown Menu */}
+                  <Text style={styles.dsLabel}>Time Shutdown Menu</Text>
+                  <View style={styles.typeRow}>
+                    {[
+                      { value: 'off', label: 'OFF' },
+                      { value: '10', label: '10s' },
+                      { value: '20', label: '20s' },
+                      { value: '60', label: '60s' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.typePill, dsShutdownMenu === opt.value && styles.activeTypePill]}
+                        onPress={async () => {
+                          setDsShutdownMenu(opt.value);
+                          await setTimedShutdownMenu(opt.value);
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsShutdownMenu === opt.value && styles.activeTypeText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Time Correction */}
+                  <Text style={styles.dsLabel}>Time Correction</Text>
+                  <View style={styles.typeRow}>
+                    {[
+                      { value: false, label: 'OFF' },
+                      { value: true, label: 'SYNC NOW' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={String(opt.value)}
+                        style={[styles.typePill, dsTimeCorrection === opt.value && styles.activeTypePill]}
+                        onPress={async () => {
+                          if (opt.value) {
+                            setDsTimeCorrection(true);
+                            await syncTimeToDevice();
+                            setTimeout(() => setDsTimeCorrection(false), 1500);
+                          } else {
+                            setDsTimeCorrection(false);
+                          }
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsTimeCorrection === opt.value && styles.activeTypeText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <View style={styles.dsDivider} />
+
+                  {/* RECORDING SETTINGS */}
+                  <Text style={styles.dsSectionTitle}>RECORDING SETTINGS</Text>
+
+                  {/* Limited Time Recording */}
+                  <Text style={styles.dsLabel}>Limited Time Recording</Text>
+                  <View style={styles.typeRow}>
+                    {[
+                      { value: 'off', label: 'OFF' },
+                      { value: '15', label: '15s' },
+                      { value: '30', label: '30s' },
+                      { value: '60', label: '60s' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.typePill, dsLimitedRecord === opt.value && styles.activeTypePill]}
+                        onPress={async () => {
+                          setDsLimitedRecord(opt.value);
+                          await setLimitedTimeRecording(opt.value);
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsLimitedRecord === opt.value && styles.activeTypeText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Audio */}
+                  <Text style={styles.dsLabel}>Audio</Text>
+                  <View style={styles.typeRow}>
+                    {[
+                      { value: 'off', label: 'OFF' },
+                      { value: 'on', label: 'ON' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.typePill, dsAudio === opt.value && styles.activeTypePill]}
+                        onPress={async () => {
+                          setDsAudio(opt.value);
+                          await setAudioStatus(opt.value);
+                        }}
+                      >
+                        <Text style={[styles.typeText, dsAudio === opt.value && styles.activeTypeText]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        )}
 
         {/* BOTTOM SECTION */}
         <View style={styles.bottomSection}>
@@ -1876,5 +2245,67 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
     marginTop: 10,
+  },
+  // Device Settings Panel
+  deviceSettingsOverlay: {
+    width: '94%',
+    maxHeight: '55%',
+    backgroundColor: 'rgba(20,20,20,0.95)',
+    borderRadius: 16,
+    marginHorizontal: '3%',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.15)',
+    overflow: 'hidden',
+  },
+  deviceSettingsScroll: {
+    flex: 1,
+  },
+  deviceSettingsContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  deviceSettingsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  deviceSettingsTitle: {
+    color: '#00E5FF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  dsSectionTitle: {
+    color: '#FF9800',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  dsLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  dsDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 12,
+  },
+  dsLoadingText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
 });
