@@ -11,13 +11,20 @@ const { width } = Dimensions.get('window');
 
 const ProfileScreen = () => {
   const navigation = useNavigation<any>();
-  const { logout, user } = useAuth();
+  const { logout, deleteAccount, user } = useAuth();
   const { showSnackbar } = useNotification();
 
   const handleLogout = () => {
     showSnackbar('Are you sure you want to log out of the tactical network?', {
       actionLabel: 'TERMINATE',
       onAction: () => logout(),
+    });
+  };
+
+  const handleDeleteAccount = () => {
+    showSnackbar('Delete account and remove local profile data from this device?', {
+      actionLabel: 'DELETE',
+      onAction: () => deleteAccount(),
     });
   };
 
@@ -137,6 +144,15 @@ const ProfileScreen = () => {
         >
           <MaterialDesignIcons name="power" size={24} color="#D32F2F" />
           <Text style={styles.logoutText}>TERMINATE SESSION</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteAccountButton}
+          onPress={handleDeleteAccount}
+          activeOpacity={0.8}
+        >
+          <MaterialDesignIcons name="account-remove-outline" size={24} color="#FF3B30" />
+          <Text style={styles.deleteAccountText}>DELETE ACCOUNT</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -303,6 +319,24 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: '#D32F2F',
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginLeft: 12,
+    fontSize: 14,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+    backgroundColor: 'rgba(255, 59, 48, 0.05)',
+    paddingVertical: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.24)',
+  },
+  deleteAccountText: {
+    color: '#FF3B30',
     fontWeight: '900',
     letterSpacing: 2,
     marginLeft: 12,

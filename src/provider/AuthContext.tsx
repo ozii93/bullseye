@@ -6,6 +6,7 @@ interface AuthContextType {
   user: any;
   login: (userData: any) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,8 +46,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoggedIn(false);
   };
 
+  const deleteAccount = async () => {
+    await AsyncStorage.multiRemove([
+      'user',
+      'device_history',
+      'lastConnectedDevice',
+    ]);
+    setUser(null);
+    setIsLoggedIn(false);
+  };
+
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, user, login, logout, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );
