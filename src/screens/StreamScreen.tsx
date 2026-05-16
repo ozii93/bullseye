@@ -11,6 +11,7 @@ import {
   ImageBackground,
   Dimensions,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { IconButton } from 'react-native-paper';
@@ -21,6 +22,7 @@ import { PALETTES as PalettesConstant } from '../core/constant';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import Slider from '@react-native-community/slider';
 import { useNotification } from '../provider/NotificationContext';
+import LoadingScreen from '../components/common/LoadingScreen';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -464,6 +466,10 @@ async function loadAllDeviceSettings(): Promise<{
 ======================================================== */
 
 const API_URL = 'http://192.168.42.1/api/v1/files/customdata';
+const BULLSEYE_MEDIA_DIR = Platform.select({
+  ios: `${RNFS.DocumentDirectoryPath}/DCIM/BullsEye`,
+  default: `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`,
+}) as string;
 
 /* =========================================================
    PALETTES
@@ -583,10 +589,13 @@ const StreamScreen = ({ navigation }: any) => {
   const isWideScreen = windowWidth > windowHeight || windowWidth >= 840;
   const horizontalChrome = isWideScreen ? 168 : 0;
   const streamSize = Math.min(
-    isWideScreen ? windowHeight * 0.86 : windowWidth * 1.08,
+    isWideScreen ? windowHeight * 0.86 : windowWidth * 0.94,
     windowWidth - horizontalChrome,
-    isWideScreen ? 620 : windowHeight * 0.58,
+    isWideScreen ? 620 : windowHeight * 0.54,
   );
+  const streamTop = isWideScreen
+    ? Math.max(12, (windowHeight - streamSize) / 2)
+    : Math.max(96, (windowHeight - streamSize) / 2 - 10);
   const deviceSettingsPanelStyle = {
     width: isWideScreen ? Math.min(330, windowWidth * 0.34) : windowWidth * 0.94,
     height: isWideScreen ? windowHeight * 0.82 : windowHeight * 0.44,
@@ -599,6 +608,7 @@ const StreamScreen = ({ navigation }: any) => {
   const [isRecording, setIsRecording] = useState(false);
   const guideRef = useRef<GuideStreamViewRef>(null);
   const [renderPlayer, setRenderPlayer] = useState(false);
+  const [isStreamLoading, setIsStreamLoading] = useState(true);
   const [lastMedia, setLastMedia] = useState<string | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showReticle, setShowReticle] = useState(false);
@@ -655,7 +665,7 @@ const StreamScreen = ({ navigation }: any) => {
     console.log('📂 STORAGE PATH:', RNFS.DocumentDirectoryPath);
     const loadLatestThumbnail = async () => {
       try {
-        const bullsEyePath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
+        const bullsEyePath = BULLSEYE_MEDIA_DIR;
 
         const docFiles = await RNFS.readDir(RNFS.DocumentDirectoryPath).catch(() => []);
         const cacheFiles = await RNFS.readDir(RNFS.CachesDirectoryPath).catch(() => []);
@@ -727,8 +737,10 @@ const StreamScreen = ({ navigation }: any) => {
     if (isFocused) {
       setPlayerKey(prev => prev + 1);
       setRenderPlayer(true);
+      setIsStreamLoading(true);
     } else {
       setRenderPlayer(false);
+      setIsStreamLoading(false);
     }
   }, [isFocused]);
 
@@ -754,7 +766,7 @@ const StreamScreen = ({ navigation }: any) => {
     try {
       console.log('📸 Taking Tactical Snapshot...');
       const filename = `BullsEye_${Date.now()}.png`;
-      const dirPath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
+      const dirPath = BULLSEYE_MEDIA_DIR;
       await RNFS.mkdir(dirPath);
       const localPath = `${dirPath}/${filename}`;
 
@@ -786,7 +798,7 @@ const StreamScreen = ({ navigation }: any) => {
         await fetch("http://192.168.42.1/api/v1/paramline").catch(() => { });
 
         const filename = `BullsEye_${Date.now()}.mp4`;
-        const dirPath = `${RNFS.ExternalDirectoryPath}/DCIM/BullsEye`;
+        const dirPath = BULLSEYE_MEDIA_DIR;
         await RNFS.mkdir(dirPath);
         const savePath = `${dirPath}/${filename}`;
         console.log("🎥 Save to:", savePath);
@@ -1150,19 +1162,34 @@ const StreamScreen = ({ navigation }: any) => {
             {
               width: streamSize,
               height: streamSize,
-              top: isWideScreen
-                ? Math.max(12, (windowHeight - streamSize) / 2)
-                : Math.max(118, windowHeight * 0.18),
+              top: streamTop,
             },
           ]}
           rtspType={1}
+          onPlaying={() => setIsStreamLoading(false)}
           onRecordComplete={handleRecordComplete}
         />
       )}
 
+      {renderPlayer && isStreamLoading && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.streamLoadingContainer,
+            {
+              width: streamSize,
+              height: streamSize,
+              top: streamTop,
+            },
+          ]}
+        >
+          <LoadingScreen isTransparent>
+            <Text style={styles.streamLoadingText}>Loading RTSP stream...</Text>
+          </LoadingScreen>
+        </View>
+      )}
 
       {/* Reticle Overlay removed as it is now handled by hardware */}
-
 
       <SafeAreaView
         style={[styles.overlayContainer, isWideScreen && styles.overlayContainerWide]}
@@ -1980,6 +2007,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     aspectRatio: 1,
     alignSelf: 'center',
+  },
+  streamLoadingContainer: {
+    position: 'absolute',
+    alignSelf: 'center',
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  streamLoadingText: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: 14,
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
   overlayContainer: {
     flex: 1,

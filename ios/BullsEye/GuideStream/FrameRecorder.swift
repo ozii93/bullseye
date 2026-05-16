@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import CoreVideo
 import UIKit
 
@@ -6,7 +7,7 @@ final class FrameRecorder {
     private var assetWriter: AVAssetWriter?
     private var assetWriterInput: AVAssetWriterInput?
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
-    private var isRecording = false
+    private(set) var isRecording = false
     private var outputURL: URL?
     private var frameCount: Int64 = 0
     private var firstPts: Double?

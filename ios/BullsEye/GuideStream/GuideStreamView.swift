@@ -120,6 +120,9 @@ final class GuideStreamView: UIView {
     }
 
     private func stopStream() {
+        if recorder.isRecording {
+            recorder.stopRecording()
+        }
         decoder.stopDecoding()
         streamStarted = false
     }

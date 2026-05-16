@@ -3,6 +3,8 @@ import UIKit
 
 @objc(GuideStreamCommands)
 final class GuideStreamCommands: NSObject, RCTBridgeModule {
+    @objc var bridge: RCTBridge!
+
     static func moduleName() -> String {
         return "GuideStreamCommands"
     }

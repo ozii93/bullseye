@@ -1,5 +1,6 @@
 import MetalKit
 import CoreVideo
+import UIKit
 
 final class MetalRenderView: MTKView {
     private var commandQueue: MTLCommandQueue?

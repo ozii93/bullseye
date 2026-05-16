@@ -1,6 +1,9 @@
 import Foundation
 import CoreVideo
+import CoreImage
 import VideoToolbox
+import UIKit
+import Darwin
 
 final class FFmpegDecoder {
     private var formatCtx: UnsafeMutablePointer<AVFormatContext>?
@@ -16,10 +19,14 @@ final class FFmpegDecoder {
     var onError: ((String) -> Void)?
 
     func openRTSP(url: String) -> Bool {
+        if pkt == nil {
+            pkt = av_packet_alloc()
+        }
+
         avformat_network_init()
 
         var ctx: UnsafeMutablePointer<AVFormatContext>?
-        let opts: OpaquePointer? = nil
+        var opts: OpaquePointer?
         let ret = avformat_open_input(&ctx, url, nil, &opts)
         if ret < 0 {
             let err = avErrorString(ret)
@@ -48,7 +55,7 @@ final class FFmpegDecoder {
             return false
         }
 
-        let codecPar = fmtCtx.pointee.streams[videoStreamIndex]!.pointee.codecpar
+        let codecPar = fmtCtx.pointee.streams[Int(videoStreamIndex)]!.pointee.codecpar
 
         guard let decoder = avcodec_find_decoder(codecPar.pointee.codec_id) else {
             onError?("Decoder not found")
@@ -108,14 +115,14 @@ final class FFmpegDecoder {
 
                 while true {
                     let recvRet = avcodec_receive_frame(cctx, frm)
-                    if recvRet == AVERROR(.eagain) || recvRet == AVERROR_EOF {
+                    if recvRet == -EAGAIN || recvRet == AVERROR_EOF {
                         break
                     }
                     if recvRet < 0 { break }
 
                     if frm.pointee.format == AV_PIX_FMT_VIDEOTOOLBOX,
                        let pixBuf = frm.pointee.data.3 {
-                        let cvBuf = Unmanaged<CVPixelBuffer>.fromOpaque(OpaquePointer(pixBuf)).takeUnretainedValue()
+                        let cvBuf = Unmanaged<CVPixelBuffer>.fromOpaque(UnsafeRawPointer(pixBuf)).takeUnretainedValue()
 
                         let pts = frm.pointee.pts
                         let timebase = fmtCtx.pointee.streams[Int(self.videoStreamIndex)]!.pointee.time_base
@@ -124,90 +131,8 @@ final class FFmpegDecoder {
                         DispatchQueue.main.async {
                             self.onFrame?(cvBuf, seconds)
                         }
-                    } else if frm.pointee.width > 0, frm.pointee.height > 0 {
-                        var swCtx: OpaquePointer?
-                        let swFrame = av_frame_alloc()
-
-                        if let swCtxPtr = UnsafeMutablePointer<OpaquePointer?>.allocate(capacity: 1) {
-                            defer { swCtxPtr.deallocate() }
-                            swCtxPtr.pointee = swCtx
-
-                            let srcFmt = frm.pointee.format
-                            let dstFmt = AV_PIX_FMT_NV12
-                            let w = frm.pointee.width
-                            let h = frm.pointee.height
-
-                            let _ = sws_getContext(
-                                w, h, srcFmt,
-                                w, h, dstFmt,
-                                SWS_FAST_BILINEAR, nil, nil, nil
-                            )
-
-                            if swFrame != nil {
-                                swFrame!.pointee.width = w
-                                swFrame!.pointee.height = h
-                                swFrame!.pointee.format = dstFmt
-                                av_frame_get_buffer(swFrame!, 0)
-
-                                let linesz = [swFrame!.pointee.linesize.0, swFrame!.pointee.linesize.1]
-                                sws_scale(
-                                    swCtx,
-                                    frm.pointee.data.map { UnsafePointer($0) },
-                                    frm.pointee.linesize.map { $0 },
-                                    0, h,
-                                    swFrame!.pointee.data,
-                                    linesz
-                                )
-
-                                var pb: CVPixelBuffer?
-                                let attrs: [String: Any] = [
-                                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-                                    kCVPixelBufferWidthKey as String: Int(w),
-                                    kCVPixelBufferHeightKey as String: Int(h),
-                                    kCVPixelBufferIOSurfacePropertiesKey as String: [:],
-                                    kCVPixelBufferMetalCompatibilityKey as String: true,
-                                ]
-                                CVPixelBufferCreate(kCFAllocatorDefault, Int(w), Int(h),
-                                    kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-                                    attrs as CFDictionary, &pb)
-
-                                if let pixBuf = pb {
-                                    CVPixelBufferLockBaseAddress(pixBuf, [])
-                                    let yPlane = CVPixelBufferGetBaseAddressOfPlane(pixBuf, 0)
-                                    let uvPlane = CVPixelBufferGetBaseAddressOfPlane(pixBuf, 1)
-                                    let yStride = CVPixelBufferGetBytesPerRowOfPlane(pixBuf, 0)
-                                    let uvStride = CVPixelBufferGetBytesPerRowOfPlane(pixBuf, 1)
-
-                                    if let ySrc = swFrame!.pointee.data.0,
-                                       let uvSrc = swFrame!.pointee.data.1 {
-                                        for row in 0..<Int(h) {
-                                            let dst = yPlane!.advanced(by: row * yStride)
-                                            let src = ySrc.advanced(by: row * Int(swFrame!.pointee.linesize.0))
-                                            dst.copyMemory(from: UnsafeRawPointer(src),
-                                                           byteCount: min(yStride, Int(swFrame!.pointee.linesize.0)))
-                                        }
-                                        let halfH = Int(h) / 2
-                                        for row in 0..<halfH {
-                                            let dst = uvPlane!.advanced(by: row * uvStride)
-                                            let src = uvSrc.advanced(by: row * Int(swFrame!.pointee.linesize.1))
-                                            dst.copyMemory(from: UnsafeRawPointer(src),
-                                                           byteCount: min(uvStride, Int(swFrame!.pointee.linesize.1)))
-                                        }
-                                    }
-                                    CVPixelBufferUnlockBaseAddress(pixBuf, [])
-
-                                    let pts = frm.pointee.pts
-                                    let timebase = fmtCtx.pointee.streams[Int(self.videoStreamIndex)]!.pointee.time_base
-                                    let seconds = Double(pts) * av_q2d(timebase)
-
-                                    DispatchQueue.main.async {
-                                        self.onFrame?(pixBuf, seconds)
-                                    }
-                                }
-                            }
-                            av_frame_free(&swFrame)
-                        }
                     }
+                    av_frame_unref(frm)
                 }
             }
         }
@@ -227,11 +152,12 @@ final class FFmpegDecoder {
         if let pkt = pkt {
             av_packet_free(&pkt)
         }
-        if let fmtCtx = formatCtx {
-            avformat_close_input(&fmtCtx)
+        if formatCtx != nil {
+            avformat_close_input(&formatCtx)
         }
-        if let hwCtx = hwDeviceCtx {
+        if var hwCtx = hwDeviceCtx {
             av_buffer_unref(&hwCtx)
+            hwDeviceCtx = nil
         }
         avformat_network_deinit()
     }

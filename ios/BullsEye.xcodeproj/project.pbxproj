@@ -15,23 +15,42 @@
 		A4551520523C4257A011D3F8 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2618D6B692DB4C24BD942E96 /* Colors.xcassets */; };
 		763439D126B44CB7B5BCF7F6 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 486CEEDEED7F4ACE85C6A1F0 /* BootSplash.storyboard */; };
 		DED959D7388545CF918A42F1 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 80EE6166B0E64EAEBB40EE70 /* Colors.xcassets */; };
+		A10000000000000000000201 /* FFmpegDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000101 /* FFmpegDecoder.swift */; };
+		A10000000000000000000202 /* FrameRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000102 /* FrameRecorder.swift */; };
+		A10000000000000000000203 /* GuideStreamCommands.m in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000103 /* GuideStreamCommands.m */; };
+		A10000000000000000000204 /* GuideStreamCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000104 /* GuideStreamCommands.swift */; };
+		A10000000000000000000205 /* GuideStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000105 /* GuideStreamView.swift */; };
+		A10000000000000000000206 /* GuideStreamViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000106 /* GuideStreamViewManager.m */; };
+		A10000000000000000000207 /* GuideStreamViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000107 /* GuideStreamViewManager.swift */; };
+		A10000000000000000000208 /* MetalRenderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000108 /* MetalRenderView.swift */; };
+		A10000000000000000000209 /* SnapshotCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000109 /* SnapshotCapture.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* NightHawk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NightHawk.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = NightHawk/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = NightHawk/Info.plist; sourceTree = "<group>"; };
-		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = NightHawk/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = BullsEye/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = BullsEye/Info.plist; sourceTree = "<group>"; };
+		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = BullsEye/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-NightHawk.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-NightHawk.debug.xcconfig"; path = "Target Support Files/Pods-NightHawk/Pods-NightHawk.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-NightHawk.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-NightHawk.release.xcconfig"; path = "Target Support Files/Pods-NightHawk/Pods-NightHawk.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-NightHawk.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-NightHawk.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = NightHawk/AppDelegate.swift; sourceTree = "<group>"; };
-		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = NightHawk/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BullsEye/AppDelegate.swift; sourceTree = "<group>"; };
+		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BullsEye/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		3A6CF269B09B4ED4B73BE533 /* BootSplash.storyboard */ = {isa = PBXFileReference; name = "BootSplash.storyboard"; path = "NightHawk/BootSplash.storyboard"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		2618D6B692DB4C24BD942E96 /* Colors.xcassets */ = {isa = PBXFileReference; name = "Colors.xcassets"; path = "NightHawk/Colors.xcassets"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = folder.assetcatalog; explicitFileType = undefined; includeInIndex = 0; };
+		3A6CF269B09B4ED4B73BE533 /* BootSplash.storyboard */ = {isa = PBXFileReference; name = "BootSplash.storyboard"; path = "BullsEye/BootSplash.storyboard"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		2618D6B692DB4C24BD942E96 /* Colors.xcassets */ = {isa = PBXFileReference; name = "Colors.xcassets"; path = "BullsEye/Colors.xcassets"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = folder.assetcatalog; explicitFileType = undefined; includeInIndex = 0; };
 		486CEEDEED7F4ACE85C6A1F0 /* BootSplash.storyboard */ = {isa = PBXFileReference; name = "BootSplash.storyboard"; path = "BullsEye/BootSplash.storyboard"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		80EE6166B0E64EAEBB40EE70 /* Colors.xcassets */ = {isa = PBXFileReference; name = "Colors.xcassets"; path = "BullsEye/Colors.xcassets"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = folder.assetcatalog; explicitFileType = undefined; includeInIndex = 0; };
+		A10000000000000000000101 /* FFmpegDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFmpegDecoder.swift; sourceTree = "<group>"; };
+		A10000000000000000000102 /* FrameRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameRecorder.swift; sourceTree = "<group>"; };
+		A10000000000000000000103 /* GuideStreamCommands.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GuideStreamCommands.m; sourceTree = "<group>"; };
+		A10000000000000000000104 /* GuideStreamCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideStreamCommands.swift; sourceTree = "<group>"; };
+		A10000000000000000000105 /* GuideStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideStreamView.swift; sourceTree = "<group>"; };
+		A10000000000000000000106 /* GuideStreamViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GuideStreamViewManager.m; sourceTree = "<group>"; };
+		A10000000000000000000107 /* GuideStreamViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideStreamViewManager.swift; sourceTree = "<group>"; };
+		A10000000000000000000108 /* MetalRenderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalRenderView.swift; sourceTree = "<group>"; };
+		A10000000000000000000109 /* SnapshotCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotCapture.swift; sourceTree = "<group>"; };
+		A10000000000000000000110 /* BullsEye-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "BullsEye-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +70,7 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				A10000000000000000000300 /* GuideStream */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
@@ -67,6 +87,23 @@
 				5DCACB8F33CDC322A6C60F78 /* libPods-NightHawk.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000300 /* GuideStream */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000110 /* BullsEye-Bridging-Header.h */,
+				A10000000000000000000101 /* FFmpegDecoder.swift */,
+				A10000000000000000000102 /* FrameRecorder.swift */,
+				A10000000000000000000103 /* GuideStreamCommands.m */,
+				A10000000000000000000104 /* GuideStreamCommands.swift */,
+				A10000000000000000000105 /* GuideStreamView.swift */,
+				A10000000000000000000106 /* GuideStreamViewManager.m */,
+				A10000000000000000000107 /* GuideStreamViewManager.swift */,
+				A10000000000000000000108 /* MetalRenderView.swift */,
+				A10000000000000000000109 /* SnapshotCapture.swift */,
+			);
+			path = BullsEye/GuideStream;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -173,8 +210,6 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				4F31B5BBBF5840459CC71092 /* BootSplash.storyboard in Resources */,
 				A4551520523C4257A011D3F8 /* Colors.xcassets in Resources */,
-				763439D126B44CB7B5BCF7F6 /* BootSplash.storyboard in Resources */,
-				DED959D7388545CF918A42F1 /* Colors.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -261,6 +296,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				A10000000000000000000201 /* FFmpegDecoder.swift in Sources */,
+				A10000000000000000000202 /* FrameRecorder.swift in Sources */,
+				A10000000000000000000203 /* GuideStreamCommands.m in Sources */,
+				A10000000000000000000204 /* GuideStreamCommands.swift in Sources */,
+				A10000000000000000000205 /* GuideStreamView.swift in Sources */,
+				A10000000000000000000206 /* GuideStreamViewManager.m in Sources */,
+				A10000000000000000000207 /* GuideStreamViewManager.swift in Sources */,
+				A10000000000000000000208 /* MetalRenderView.swift in Sources */,
+				A10000000000000000000209 /* SnapshotCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -275,7 +319,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
-				INFOPLIST_FILE = NightHawk/Info.plist;
+				INFOPLIST_FILE = BullsEye/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -290,6 +334,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = NightHawk;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_OBJC_BRIDGING_HEADER = "BullsEye/GuideStream/BullsEye-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -304,7 +349,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = NightHawk/Info.plist;
+				INFOPLIST_FILE = BullsEye/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -319,6 +364,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = NightHawk;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_OBJC_BRIDGING_HEADER = "BullsEye/GuideStream/BullsEye-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
