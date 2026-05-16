@@ -10,6 +10,7 @@ import {
   Image,
   ImageBackground,
   Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { IconButton } from 'react-native-paper';
@@ -578,6 +579,19 @@ async function sendPallet(id: number) {
 const StreamScreen = ({ navigation }: any) => {
   const isFocused = useIsFocused();
   const { showSnackbar } = useNotification();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isWideScreen = windowWidth > windowHeight || windowWidth >= 840;
+  const horizontalChrome = isWideScreen ? 168 : 0;
+  const streamSize = Math.min(
+    isWideScreen ? windowHeight * 0.86 : windowWidth * 1.08,
+    windowWidth - horizontalChrome,
+    isWideScreen ? 620 : windowHeight * 0.58,
+  );
+  const deviceSettingsPanelStyle = {
+    width: isWideScreen ? Math.min(330, windowWidth * 0.34) : windowWidth * 0.94,
+    height: isWideScreen ? windowHeight * 0.82 : windowHeight * 0.44,
+    maxHeight: isWideScreen ? windowHeight * 0.82 : windowHeight * 0.44,
+  };
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
   const [activePalette, setActivePalette] = useState(0);
   const [playerKey, setPlayerKey] = useState(1);
@@ -934,7 +948,7 @@ const StreamScreen = ({ navigation }: any) => {
   };
 
   const renderDeviceSettingsPanel = () => (
-    <View style={styles.deviceSettingsOverlay}>
+    <View style={[styles.deviceSettingsOverlay, deviceSettingsPanelStyle]}>
       <View style={styles.deviceSettingsHeader}>
         <Text style={styles.deviceSettingsTitle}>DEVICE SETTINGS</Text>
         <IconButton
@@ -1131,7 +1145,16 @@ const StreamScreen = ({ navigation }: any) => {
         <StreamPlayer
           ref={guideRef}
           key={playerKey}
-          style={styles.videoStream}
+          style={[
+            styles.videoStream,
+            {
+              width: streamSize,
+              height: streamSize,
+              top: isWideScreen
+                ? Math.max(12, (windowHeight - streamSize) / 2)
+                : Math.max(118, windowHeight * 0.18),
+            },
+          ]}
           rtspType={1}
           onRecordComplete={handleRecordComplete}
         />
@@ -1141,10 +1164,13 @@ const StreamScreen = ({ navigation }: any) => {
       {/* Reticle Overlay removed as it is now handled by hardware */}
 
 
-      <SafeAreaView style={styles.overlayContainer} edges={['top', 'bottom']}>
+      <SafeAreaView
+        style={[styles.overlayContainer, isWideScreen && styles.overlayContainerWide]}
+        edges={['top', 'bottom', 'left', 'right']}
+      >
         {/* HEADER */}
-        <View style={styles.floatingHeader}>
-          <View style={styles.headerLeft}>
+        <View style={[styles.floatingHeader, isWideScreen && styles.floatingHeaderWide]}>
+          <View style={[styles.headerLeft, isWideScreen && styles.headerRailGroup]}>
             <IconButton
               icon="chevron-left"
               iconColor="#FFF"
@@ -1166,7 +1192,7 @@ const StreamScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <View style={styles.headerCenter}>
+          <View style={[styles.headerCenter, isWideScreen && styles.headerCenterWide]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {isRecording && (
                 <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}>
@@ -1183,7 +1209,7 @@ const StreamScreen = ({ navigation }: any) => {
             )}
           </View>
 
-          <View style={styles.headerRight}>
+          <View style={[styles.headerRight, isWideScreen && styles.headerRailGroup]}>
             <IconButton
               icon="crosshairs"
               iconColor={showReticle ? '#00E5FF' : '#FFF'}
@@ -1454,7 +1480,7 @@ const StreamScreen = ({ navigation }: any) => {
         )}
 
         {/* BOTTOM SECTION */}
-        <View style={styles.bottomSection}>
+        <View style={[styles.bottomSection, isWideScreen && styles.bottomSectionWide]}>
           {isDeviceSettingsVisible && renderDeviceSettingsPanel()}
 
           {isPaletteVisible && (
@@ -1841,7 +1867,7 @@ const StreamScreen = ({ navigation }: any) => {
             </View>
           )}
 
-          <View style={styles.bottomDock}>
+          <View style={[styles.bottomDock, isWideScreen && styles.bottomDockWide]}>
             <View style={styles.dockItem}>
               <TouchableOpacity
                 style={styles.galleryButton}
@@ -1952,17 +1978,15 @@ const styles = StyleSheet.create({
   },
   videoStream: {
     position: 'absolute',
-    top: 170,
     aspectRatio: 1,
-
-    width: 500,
-    height: 500,
-
     alignSelf: 'center',
   },
   overlayContainer: {
     flex: 1,
     justifyContent: 'space-between',
+  },
+  overlayContainerWide: {
+    justifyContent: 'center',
   },
   // SCOPE DESIGN
   scopeOverlay: {
@@ -1998,12 +2022,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginTop: 20,
   },
+  floatingHeaderWide: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    bottom: 8,
+    width: 64,
+    marginTop: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 8,
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    borderRadius: 32,
+    backgroundColor: 'rgba(20,20,20,0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
   headerLeft: { flexDirection: 'row', width: 50 },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     width: 100
+  },
+  headerRailGroup: {
+    width: 64,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  headerCenterWide: {
+    marginVertical: 8,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -2081,6 +2131,16 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     alignItems: 'center',
   },
+  bottomSectionWide: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    bottom: 8,
+    width: 340,
+    paddingBottom: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+  },
   paletteWrapper: {
     width: '100%',
     marginBottom: 16,
@@ -2141,6 +2201,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
+  },
+  bottomDockWide: {
+    width: 64,
+    height: 360,
+    flexDirection: 'column',
+    borderRadius: 32,
+    paddingHorizontal: 0,
+    paddingVertical: 10,
   },
   dockItem: {
     flex: 1,

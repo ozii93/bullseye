@@ -5,11 +5,11 @@ import {
   FlatList, 
   TouchableOpacity, 
   Image, 
-  Dimensions,
   Text,
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { Surface, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,10 +18,6 @@ import MaterialDesignIcons from '@react-native-vector-icons/material-design-icon
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 import { useNotification } from '../provider/NotificationContext';
-
-const { width } = Dimensions.get('window');
-const COLUMN_COUNT = 3;
-const ITEM_SIZE = width / COLUMN_COUNT;
 
 interface DeviceFile {
   name: string;
@@ -73,6 +69,12 @@ const mapDeviceFileToViewerItem = (file: DeviceFile) => ({
 
 const GalleryScreen = ({ navigation }: any) => {
   const { showSnackbar } = useNotification();
+  const { width, height } = useWindowDimensions();
+  const isWideScreen = width > height;
+  const columnCount = isWideScreen
+    ? Math.max(4, Math.min(8, Math.floor(width / 150)))
+    : 3;
+  const itemSize = width / columnCount;
   const [activeTab, setActiveTab] = useState<'local' | 'device'>('local');
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
   const [cloudFiles, setCloudFiles] = useState<DeviceFile[]>([]);
@@ -330,7 +332,7 @@ const GalleryScreen = ({ navigation }: any) => {
     const isVideo = item.endsWith('.mp4') || item.endsWith('.ts');
     const isSelected = selectedLocalUris.includes(item);
     return (
-      <TouchableOpacity style={styles.mediaItem} activeOpacity={0.8}
+      <TouchableOpacity style={[styles.mediaItem, { width: itemSize, height: itemSize }]} activeOpacity={0.8}
         onLongPress={() => toggleLocalSelection(item)}
         onPress={() => isSelecting ? toggleLocalSelection(item) : navigation.navigate('RecentMedia', { uri: item })}>
         <Surface style={[styles.thumbnailFrame, isSelected && styles.selectedFrame]} elevation={2}>
@@ -352,7 +354,7 @@ const GalleryScreen = ({ navigation }: any) => {
       ? `http://192.168.42.1/api/v1/files/videos/${filename}/thumb/1`
       : getDeviceFileUrl(item);
     return (
-      <TouchableOpacity style={styles.mediaItem} activeOpacity={0.8}
+      <TouchableOpacity style={[styles.mediaItem, { width: itemSize, height: itemSize }]} activeOpacity={0.8}
         onLongPress={() => toggleDeviceSelection(item.name)}
         onPress={() => handleDeviceFilePress(item)}>
         <Surface style={[styles.thumbnailFrame, isSelected && styles.selectedFrame]} elevation={2}>
@@ -447,10 +449,11 @@ const GalleryScreen = ({ navigation }: any) => {
         {activeTab === 'local' ? (
           mediaFiles.length > 0 ? (
             <FlatList
+              key={`local-${columnCount}`}
               data={mediaFiles}
               renderItem={renderMediaItem}
               keyExtractor={(item) => item}
-              numColumns={COLUMN_COUNT}
+              numColumns={columnCount}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               refreshControl={
@@ -492,10 +495,11 @@ const GalleryScreen = ({ navigation }: any) => {
             </View>
           ) : cloudFiles.length > 0 ? (
             <FlatList
+              key={`device-${columnCount}`}
               data={cloudFiles}
               renderItem={renderDeviceItem}
               keyExtractor={(item) => item.name}
-              numColumns={COLUMN_COUNT}
+              numColumns={columnCount}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
             />
@@ -623,8 +627,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   mediaItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
     padding: 2,
   },
   thumbnailFrame: {

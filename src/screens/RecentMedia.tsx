@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
   FlatList,
   Image,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { IconButton } from 'react-native-paper';
@@ -15,8 +15,6 @@ import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import Video from 'react-native-video';
 import Share from 'react-native-share';
 import { useNotification } from '../provider/NotificationContext';
-
-const { width } = Dimensions.get('window');
 
 type MediaItem = {
   uri: string;
@@ -45,6 +43,8 @@ const getDeviceDeleteUrl = (item: MediaItem) =>
 const RecentMedia = ({ route, navigation }: any) => {
   const { uri, mediaItems } = route.params || {};
   const { showSnackbar } = useNotification();
+  const { width, height } = useWindowDimensions();
+  const isWideScreen = width > height;
 
   const [mediaFiles, setMediaFiles] = useState<MediaItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -292,7 +292,7 @@ const RecentMedia = ({ route, navigation }: any) => {
     index: number;
   }) => {
     return (
-      <View style={styles.slide}>
+      <View style={[styles.slide, { width }]}>
         {item.isVideo ? (
           <Video
             source={{ uri: item.uri }}
@@ -412,9 +412,7 @@ const RecentMedia = ({ route, navigation }: any) => {
 
       {/* ACTION */}
       <View
-        style={
-          styles.actionRow
-        }
+        style={[styles.actionRow, isWideScreen && styles.actionRowWide]}
       >
         <IconButton
           icon="share-variant"
@@ -490,7 +488,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slide: {
-    width,
     height: '100%',
     justifyContent:
       'center',
@@ -514,6 +511,20 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor:
       '#1C1C1E',
+  },
+  actionRowWide: {
+    position: 'absolute',
+    right: 18,
+    top: 80,
+    bottom: 18,
+    width: 64,
+    flexDirection: 'column',
+    borderTopWidth: 0,
+    borderLeftWidth: 1,
+    borderLeftColor: '#1C1C1E',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 32,
+    paddingVertical: 18,
   },
   mainActionButton: {
     backgroundColor: '#FFF',
