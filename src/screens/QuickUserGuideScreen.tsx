@@ -6,17 +6,18 @@ import {
   ScrollView,
   Dimensions,
   StatusBar,
-  Alert,
 } from 'react-native';
 import { Text, Surface, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 import RNFS from 'react-native-fs';
+import { useNotification } from '../provider/NotificationContext';
 
 const { width } = Dimensions.get('window');
 
 const QuickUserGuideScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
+  const { showSnackbar } = useNotification();
 
   const handleOpenManual = async () => {
     setLoading(true);
@@ -37,7 +38,7 @@ const QuickUserGuideScreen = ({ navigation }: any) => {
       });
     } catch (error) {
       console.error('Error processing PDF:', error);
-      Alert.alert('Error', 'Gagal memproses manual sistem. Pastikan file PDF sudah tersedia di folder assets.');
+      showSnackbar('Gagal memproses manual sistem. Pastikan file PDF sudah tersedia di folder assets.');
     } finally {
       setLoading(false);
     }

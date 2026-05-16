@@ -5,9 +5,9 @@ import {
   Image,
   Dimensions,
   StatusBar,
-  Alert,
   Animated,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import {
   Text,
@@ -16,8 +16,10 @@ import {
   useTheme,
 } from 'react-native-paper';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { appleAuth, AppleButton } from '@invertase/react-native-apple-authentication';
 import { useAuth } from '../provider/AuthContext';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
+import { useNotification } from '../provider/NotificationContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,6 +32,7 @@ GoogleSignin.configure({
 const LoginScreen = ({ navigation }: any) => {
   const theme = useTheme();
   const { login } = useAuth();
+  const { showSnackbar } = useNotification();
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
@@ -47,13 +50,52 @@ const LoginScreen = ({ navigation }: any) => {
           token: userInfo.data.idToken,
         };
         await login(userData);
-        Alert.alert('Access Granted', `Welcome, ${userData.name}`);
+        showSnackbar(`Access Granted: Welcome, ${userData.name}`);
       }
     } catch (error: any) {
       if (error.code !== statusCodes.SIGN_IN_CANCELLED) {
         console.log('Google Sign-In Error:', error);
-        Alert.alert('Access Denied', `Error: ${error.code || error.message}`);
+        showSnackbar(`Access Denied: ${error.code || error.message}`);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (!appleAuth.isSupported || Platform.OS !== 'ios') {
+      showSnackbar('Apple Sign-In is only available on compatible iOS devices.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const appleAuthResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+      });
+
+      const userId = appleAuthResponse.user;
+      const identityToken = appleAuthResponse.identityToken;
+      const email = appleAuthResponse.email || '';
+      const fullName = appleAuthResponse.fullName;
+      const name = fullName
+        ? `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim() || 'Apple User'
+        : 'Apple User';
+
+      const userData = {
+        id: userId,
+        name,
+        email,
+        token: identityToken,
+        provider: 'apple',
+      };
+
+      await login(userData);
+      showSnackbar(`Access Granted: Welcome, ${name}`);
+    } catch (error: any) {
+      console.log('Apple Sign-In Error:', error);
+      showSnackbar(`Access Denied: ${error?.message || 'Unable to complete Apple Sign-In.'}`);
     } finally {
       setLoading(false);
     }
@@ -117,6 +159,16 @@ const LoginScreen = ({ navigation }: any) => {
               <MaterialDesignIcons name="shield-key-outline" size={20} color="rgba(255,255,255,0.4)" />
             </View>
           </TouchableOpacity>
+
+          {appleAuth.isSupported && Platform.OS === 'ios' && (
+            <AppleButton
+              buttonStyle={AppleButton.Style.BLACK}
+              buttonType={AppleButton.Type.SIGN_IN}
+              style={styles.appleButton}
+              cornerRadius={16}
+              onPress={handleAppleLogin}
+            />
+          )}
 
           <View style={styles.footerInfo}>
             <MaterialDesignIcons name="lock" size={12} color="#D32F2F" />
@@ -273,6 +325,11 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     flex: 1,
     textAlign: 'center',
+  },
+  appleButton: {
+    width: '100%',
+    height: 56,
+    marginTop: 18,
   },
   footerInfo: {
     flexDirection: 'row',

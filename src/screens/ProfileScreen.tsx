@@ -1,26 +1,24 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, StatusBar, Linking, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Linking, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Text, Avatar, Surface, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons';
 import { useAuth } from '../provider/AuthContext';
+import { useNotification } from '../provider/NotificationContext';
 
 const { width } = Dimensions.get('window');
 
 const ProfileScreen = () => {
   const navigation = useNavigation<any>();
   const { logout, user } = useAuth();
+  const { showSnackbar } = useNotification();
 
   const handleLogout = () => {
-    Alert.alert(
-      'TERMINATE SESSION',
-      'Are you sure you want to log out of the tactical network?',
-      [
-        { text: 'ABORT', style: 'cancel' },
-        { text: 'TERMINATE', style: 'destructive', onPress: () => logout() },
-      ]
-    );
+    showSnackbar('Are you sure you want to log out of the tactical network?', {
+      actionLabel: 'TERMINATE',
+      onAction: () => logout(),
+    });
   };
 
   const openWifiSettings = () => {
@@ -32,11 +30,7 @@ const ProfileScreen = () => {
   };
 
   const showSecurityClearance = () => {
-    Alert.alert(
-      'SECURITY CLEARANCE',
-      `Subject: ${user?.name || 'OPERATIVE'}\nLevel: TOP SECRET\nEncryption: AES-256 ACTIVE\nStatus: VERIFIED`,
-      [{ text: 'ACKNOWLEDGE', style: 'default' }]
-    );
+    showSnackbar(`Security Clearance: ${user?.name || 'OPERATIVE'} | TOP SECRET | VERIFIED`);
   };
 
   const openPrivacyPolicy = () => {

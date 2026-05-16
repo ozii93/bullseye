@@ -6,7 +6,6 @@ import {
   ScrollView,
   Text,
   StatusBar,
-  Alert,
   DeviceEventEmitter,
 } from 'react-native';
 import { IconButton } from 'react-native-paper';
@@ -484,4 +483,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
 });
-

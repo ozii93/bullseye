@@ -4,6 +4,7 @@ import AppNavigator from '../navigation/AppNavigator'
 import { useTheme } from 'react-native-paper'
 import BootSplash from 'react-native-bootsplash';
 import { AuthProvider, useAuth } from './AuthContext'
+import { NotificationProvider } from './NotificationContext'
 
 const AppProviderContent = () => {
   const { isLoggedIn } = useAuth()
@@ -33,7 +34,9 @@ const AppProviderContent = () => {
 const AppProvider = () => {
   return (
     <AuthProvider>
-      <AppProviderContent />
+      <NotificationProvider>
+        <AppProviderContent />
+      </NotificationProvider>
     </AuthProvider>
   )
 }

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -15,6 +14,7 @@ import RNFS from 'react-native-fs';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import Video from 'react-native-video';
 import Share from 'react-native-share';
+import { useNotification } from '../provider/NotificationContext';
 
 const { width } = Dimensions.get('window');
 
@@ -44,6 +44,7 @@ const getDeviceDeleteUrl = (item: MediaItem) =>
 
 const RecentMedia = ({ route, navigation }: any) => {
   const { uri, mediaItems } = route.params || {};
+  const { showSnackbar } = useNotification();
 
   const [mediaFiles, setMediaFiles] = useState<MediaItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -184,10 +185,7 @@ const RecentMedia = ({ route, navigation }: any) => {
       const exists = await RNFS.exists(localPath);
 
       if (!exists) {
-        Alert.alert(
-          'Gagal',
-          'File media tidak ditemukan',
-        );
+        showSnackbar('File media tidak ditemukan');
         return;
       }
 
@@ -229,79 +227,61 @@ const RecentMedia = ({ route, navigation }: any) => {
         album: 'BullsEye',
       });
 
-      Alert.alert(
-        'Sukses',
-        'Media berhasil disimpan',
-      );
+      showSnackbar('Media berhasil disimpan');
     } catch (error) {
-      Alert.alert(
-        'Gagal',
-        'Tidak bisa menyimpan media',
-      );
+      showSnackbar('Tidak bisa menyimpan media');
     }
   };
 
   const handleDelete = () => {
     if (!activeItem) return;
 
-    Alert.alert(
-      'Hapus Media',
-      'Yakin ingin menghapus file ini?',
-      [
-        {
-          text: 'Batal',
-          style: 'cancel',
-        },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (activeItem.source === 'device') {
-                const response = await fetch(getDeviceDeleteUrl(activeItem), {
-                  method: 'DELETE',
-                });
+    showSnackbar('Yakin ingin menghapus file ini?', {
+      actionLabel: 'HAPUS',
+      onAction: async () => {
+        try {
+          if (activeItem.source === 'device') {
+            const response = await fetch(getDeviceDeleteUrl(activeItem), {
+              method: 'DELETE',
+            });
 
-                if (!response.ok) {
-                  throw new Error(`Delete failed: ${response.status}`);
-                }
-              } else if (activeItem.path) {
-                await RNFS.unlink(
-                  activeItem.path,
-                );
-              }
-
-              const updated =
-                mediaFiles.filter(
-                  (_, i) =>
-                    i !== currentIndex,
-                );
-
-              if (updated.length === 0) {
-                navigation.goBack();
-                return;
-              }
-
-              setMediaFiles(updated);
-
-              if (
-                currentIndex >=
-                updated.length
-              ) {
-                setCurrentIndex(
-                  updated.length - 1,
-                );
-              }
-            } catch (error) {
-              Alert.alert(
-                'Error',
-                'Gagal hapus file',
-              );
+            if (!response.ok) {
+              throw new Error(`Delete failed: ${response.status}`);
             }
-          },
-        },
-      ],
-    );
+          } else if (activeItem.path) {
+            await RNFS.unlink(
+              activeItem.path,
+            );
+          }
+
+          const updated =
+            mediaFiles.filter(
+              (_, i) =>
+                i !== currentIndex,
+            );
+
+          if (updated.length === 0) {
+            showSnackbar('Media berhasil dihapus');
+            navigation.goBack();
+            return;
+          }
+
+          setMediaFiles(updated);
+          showSnackbar('Media berhasil dihapus');
+
+          if (
+            currentIndex >=
+            updated.length
+          ) {
+            setCurrentIndex(
+              updated.length - 1,
+            );
+          }
+        } catch (error) {
+          showSnackbar('Gagal hapus file');
+        }
+      },
+    });
   };
 
   const renderItem = ({

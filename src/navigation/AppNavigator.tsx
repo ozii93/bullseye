@@ -5,7 +5,7 @@ import {
 import { memo, useEffect, useRef } from 'react'
 import LoginScreen from '../screens/LoginScreen'
 import React from 'react'
-import { Alert, BackHandler } from 'react-native'
+import { BackHandler } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import BottomTabBar from '../components/layout/BottomTabBar'
 import StreamScreen from '../screens/StreamScreen'
@@ -16,6 +16,7 @@ import PDFViewerScreen from '../screens/PDFViewerScreen'
 import FAQScreen from '../screens/FAQScreen'
 import AboutScreen from '../screens/AboutScreen'
 import DeviceHistoryScreen from '../screens/DeviceHistoryScreen'
+import { useNotification } from '../provider/NotificationContext'
 
 type MainStackParamList = {
   Login: undefined
@@ -37,6 +38,7 @@ const MainStack = createNativeStackNavigator<MainStackParamList>()
 const AppNavigator = memo(
   (props: { isLoggedIn: boolean }) => {
     const { isLoggedIn } = props
+    const { showSnackbar } = useNotification()
 
     const navigationRef = useRef<NavigationContainerRef<any>>(null)
     const routeNameRef = useRef<string | undefined>(undefined)
@@ -53,23 +55,10 @@ const AppNavigator = memo(
         routeNameRef.current == 'Login' ||
         routeNameRef.current == 'Main'
       ) {
-        Alert.alert(
-          'Hold on!',
-          'Are you sure you want to exit app?',
-          [
-            {
-              text: 'Cancel',
-              onPress: () => {
-                return true
-              },
-              style: 'cancel',
-            },
-            {
-              text: 'YES',
-              onPress: () => BackHandler.exitApp(),
-            },
-          ]
-        )
+        showSnackbar('Are you sure you want to exit app?', {
+          actionLabel: 'YES',
+          onAction: () => BackHandler.exitApp(),
+        })
         return true
       }
     }

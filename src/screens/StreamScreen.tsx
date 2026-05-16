@@ -6,7 +6,6 @@ import {
   ScrollView,
   Text,
   StatusBar,
-  Alert,
   DeviceEventEmitter,
   Image,
   ImageBackground,
@@ -20,8 +19,9 @@ import RNFS from 'react-native-fs';
 import { PALETTES as PalettesConstant } from '../core/constant';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import Slider from '@react-native-community/slider';
+import { useNotification } from '../provider/NotificationContext';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const RETICLE_TYPES = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, label: `Type ${i + 1}` }));
 
@@ -329,7 +329,7 @@ const DS_BASE = 'http://192.168.42.1/api/v1';
 async function dsGet(endpoint: string): Promise<any> {
   const url = `${DS_BASE}${endpoint}`;
   try {
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' } });
     if (response.ok) {
       const text = await response.text();
       if (text) return JSON.parse(text);
@@ -345,7 +345,7 @@ async function dsPut(endpoint: string, value: string): Promise<boolean> {
   try {
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' },
       body: JSON.stringify({ value }),
     });
     console.log(`✅ DS PUT ${endpoint} = ${value} (${response.status})`);
@@ -577,6 +577,7 @@ async function sendPallet(id: number) {
 
 const StreamScreen = ({ navigation }: any) => {
   const isFocused = useIsFocused();
+  const { showSnackbar } = useNotification();
   const [isPaletteVisible, setIsPaletteVisible] = useState(false);
   const [activePalette, setActivePalette] = useState(0);
   const [playerKey, setPlayerKey] = useState(1);
@@ -753,10 +754,10 @@ const StreamScreen = ({ navigation }: any) => {
       const displayUri = `file://${localPath}?t=${Date.now()}`;
       setLastMedia(displayUri);
       console.log('✅ Snapshot Secure:', localPath);
-      Alert.alert('Sukses', 'Foto berhasil disimpan');
+      showSnackbar('Foto berhasil disimpan');
     } catch (e: any) {
       console.log('❌ Capture Error:', e);
-      Alert.alert('CAPTURE FAILED', 'Gagal mengeksekusi pengambilan foto.');
+      showSnackbar('Gagal mengeksekusi pengambilan foto.');
     }
   };
 
@@ -789,7 +790,7 @@ const StreamScreen = ({ navigation }: any) => {
     const { path } = event.nativeEvent;
     console.log("✅ Record complete:", path);
     setLastMedia(`file://${path}`);
-    Alert.alert("Sukses", `Video berhasil disimpan`);
+    showSnackbar('Video berhasil disimpan');
   };
 
   const handleOpenZeroCalibration = async () => {
@@ -798,6 +799,7 @@ const StreamScreen = ({ navigation }: any) => {
 
     setIsReticleToolsVisible(false);
     setIsPaletteVisible(false);
+    setIsDeviceSettingsVisible(false);
     setShowReticle(false);
 
     // Sync current X/Y coordinates from device paramline
@@ -928,8 +930,194 @@ const StreamScreen = ({ navigation }: any) => {
     }
     setIsZeroCalibrationVisible(false);
     setIsFrozen(false);
-    Alert.alert('Sukses', 'Zero calibration berhasil disimpan');
+    showSnackbar('Zero calibration berhasil disimpan');
   };
+
+  const renderDeviceSettingsPanel = () => (
+    <View style={styles.deviceSettingsOverlay}>
+      <View style={styles.deviceSettingsHeader}>
+        <Text style={styles.deviceSettingsTitle}>DEVICE SETTINGS</Text>
+        <IconButton
+          icon="close"
+          iconColor="rgba(255,255,255,0.62)"
+          size={20}
+          onPress={() => setIsDeviceSettingsVisible(false)}
+          style={styles.panelCloseButton}
+        />
+      </View>
+
+      {dsLoading ? (
+        <Text style={styles.dsLoadingText}>Loading settings...</Text>
+      ) : (
+        <ScrollView
+          style={styles.deviceSettingsScroll}
+          contentContainerStyle={styles.deviceSettingsContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.dsSectionTitle}>GENERAL SETTINGS</Text>
+
+          <Text style={styles.dsLabel}>Compensation Mode</Text>
+          <View style={styles.dsOptionRow}>
+            {['auto', 'manual'].map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                style={[styles.typePill, dsCompensation === mode && styles.activeTypePill]}
+                onPress={async () => {
+                  setDsCompensation(mode);
+                  await setCompensationMode(mode);
+                }}
+              >
+                <Text style={[styles.typeText, dsCompensation === mode && styles.activeTypeText]}>
+                  {mode === 'auto' ? 'Auto' : 'Manual'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.dsLabel}>Smart Sleep</Text>
+          <View style={styles.dsOptionRow}>
+            {[
+              { value: 'off', label: 'OFF' },
+              { value: 'on', label: 'ON' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.typePill, dsSmartSleep === opt.value && styles.activeTypePill]}
+                onPress={async () => {
+                  setDsSmartSleep(opt.value);
+                  await setSmartSleep(opt.value);
+                }}
+              >
+                <Text style={[styles.typeText, dsSmartSleep === opt.value && styles.activeTypeText]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.dsLabel}>Timed Shutdown</Text>
+          <View style={styles.dsOptionRow}>
+            {[
+              { value: 'off', label: 'OFF' },
+              { value: '15', label: '15min' },
+              { value: '30', label: '30min' },
+              { value: '60', label: '60min' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.typePill, dsTimedShutdown === opt.value && styles.activeTypePill]}
+                onPress={async () => {
+                  setDsTimedShutdown(opt.value);
+                  await setSleepShutdown(dsAutoSleepVal, opt.value);
+                }}
+              >
+                <Text style={[styles.typeText, dsTimedShutdown === opt.value && styles.activeTypeText]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.dsLabel}>Time Shutdown Menu</Text>
+          <View style={styles.dsOptionRow}>
+            {[
+              { value: 'off', label: 'OFF' },
+              { value: '10', label: '10s' },
+              { value: '20', label: '20s' },
+              { value: '60', label: '60s' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.typePill, dsShutdownMenu === opt.value && styles.activeTypePill]}
+                onPress={async () => {
+                  setDsShutdownMenu(opt.value);
+                  await setTimedShutdownMenu(opt.value);
+                }}
+              >
+                <Text style={[styles.typeText, dsShutdownMenu === opt.value && styles.activeTypeText]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.dsLabel}>Time Correction</Text>
+          <View style={styles.dsOptionRow}>
+            {[
+              { value: false, label: 'OFF' },
+              { value: true, label: 'SYNC NOW' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={String(opt.value)}
+                style={[styles.typePill, dsTimeCorrection === opt.value && styles.activeTypePill]}
+                onPress={async () => {
+                  if (opt.value) {
+                    setDsTimeCorrection(true);
+                    await syncTimeToDevice();
+                    setTimeout(() => setDsTimeCorrection(false), 1500);
+                  } else {
+                    setDsTimeCorrection(false);
+                  }
+                }}
+              >
+                <Text style={[styles.typeText, dsTimeCorrection === opt.value && styles.activeTypeText]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.dsDivider} />
+
+          <Text style={styles.dsSectionTitle}>RECORDING SETTINGS</Text>
+
+          <Text style={styles.dsLabel}>Limited Time Recording</Text>
+          <View style={styles.dsOptionRow}>
+            {[
+              { value: 'off', label: 'OFF' },
+              { value: '15', label: '15s' },
+              { value: '30', label: '30s' },
+              { value: '60', label: '60s' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.typePill, dsLimitedRecord === opt.value && styles.activeTypePill]}
+                onPress={async () => {
+                  setDsLimitedRecord(opt.value);
+                  await setLimitedTimeRecording(opt.value);
+                }}
+              >
+                <Text style={[styles.typeText, dsLimitedRecord === opt.value && styles.activeTypeText]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.dsLabel}>Audio</Text>
+          <View style={styles.dsOptionRow}>
+            {[
+              { value: 'off', label: 'OFF' },
+              { value: 'on', label: 'ON' },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.typePill, dsAudio === opt.value && styles.activeTypePill]}
+                onPress={async () => {
+                  setDsAudio(opt.value);
+                  await setAudioStatus(opt.value);
+                }}
+              >
+                <Text style={[styles.typeText, dsAudio === opt.value && styles.activeTypeText]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.mainContainer}>
@@ -970,7 +1158,10 @@ const StreamScreen = ({ navigation }: any) => {
               icon="toolbox-outline"
               iconColor={isToolkitVisible ? '#FF9800' : '#FFF'}
               size={22}
-              onPress={() => setIsToolkitVisible(!isToolkitVisible)}
+              onPress={() => {
+                setIsDeviceSettingsVisible(false);
+                setIsToolkitVisible(!isToolkitVisible);
+              }}
               style={{ marginRight: 8 }}
             />
           </View>
@@ -1003,6 +1194,7 @@ const StreamScreen = ({ navigation }: any) => {
                 if (newState) {
                   setIsPaletteVisible(false);
                   setIsZeroCalibrationVisible(false);
+                  setIsDeviceSettingsVisible(false);
 
                   setIsReticleToolsVisible(true);
                   // Enable reticle on hardware with current type
@@ -1045,15 +1237,19 @@ const StreamScreen = ({ navigation }: any) => {
                   setShowReticle(false);
                   // Load current device settings
                   setDsLoading(true);
-                  const settings = await loadAllDeviceSettings();
-                  setDsCompensation(settings.compensation);
-                  setDsSmartSleep(settings.smartSleep);
-                  setDsAutoSleepVal(settings.sleepVal);
-                  setDsTimedShutdown(settings.shutdown);
-                  setDsShutdownMenu(settings.shutdownMenu);
-                  setDsLimitedRecord(settings.limitedRecord);
-                  setDsAudio(settings.audio);
-                  setDsLoading(false);
+                  try {
+                    const settings = await loadAllDeviceSettings();
+                    console.log(settings)
+                    setDsCompensation(settings.compensation);
+                    setDsSmartSleep(settings.smartSleep);
+                    setDsAutoSleepVal(settings.sleepVal);
+                    setDsTimedShutdown(settings.shutdown);
+                    setDsShutdownMenu(settings.shutdownMenu);
+                    setDsLimitedRecord(settings.limitedRecord);
+                    setDsAudio(settings.audio);
+                  } finally {
+                    setDsLoading(false);
+                  }
                 }
               }}
             />
@@ -1061,7 +1257,7 @@ const StreamScreen = ({ navigation }: any) => {
         </View>
 
         {/* DEVICE SETTINGS PANEL */}
-        {isDeviceSettingsVisible && (
+        {false && isDeviceSettingsVisible && (
           <View style={styles.deviceSettingsOverlay}>
             <ScrollView
               style={styles.deviceSettingsScroll}
@@ -1088,7 +1284,7 @@ const StreamScreen = ({ navigation }: any) => {
                   {/* Compensation Mode */}
                   <Text style={styles.dsLabel}>Compensation Mode</Text>
                   <View style={styles.typeRow}>
-                    {['auto', 'shutter', 'scene'].map((mode) => (
+                    {['auto', 'manual'].map((mode) => (
                       <TouchableOpacity
                         key={mode}
                         style={[styles.typePill, dsCompensation === mode && styles.activeTypePill]}
@@ -1098,7 +1294,7 @@ const StreamScreen = ({ navigation }: any) => {
                         }}
                       >
                         <Text style={[styles.typeText, dsCompensation === mode && styles.activeTypeText]}>
-                          {mode === 'auto' ? 'Auto' : mode === 'shutter' ? 'Shutter' : 'Scene'}
+                          {mode === 'auto' ? 'Auto' : 'Manual'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -1259,6 +1455,8 @@ const StreamScreen = ({ navigation }: any) => {
 
         {/* BOTTOM SECTION */}
         <View style={styles.bottomSection}>
+          {isDeviceSettingsVisible && renderDeviceSettingsPanel()}
+
           {isPaletteVisible && (
             <View style={styles.paletteWrapper}>
               <ScrollView
@@ -1696,6 +1894,7 @@ const StreamScreen = ({ navigation }: any) => {
                   setIsZeroCalibrationVisible(false);
                   setShowReticle(false);
                   setIsPaletteVisible(false)
+                  setIsDeviceSettingsVisible(false);
 
                   setIsImageAdjustVisible(opening);
                   if (opening) {
@@ -1720,6 +1919,7 @@ const StreamScreen = ({ navigation }: any) => {
                   setIsZeroCalibrationVisible(false);
                   setShowReticle(false);
                   setIsImageAdjustVisible(false);
+                  setIsDeviceSettingsVisible(false);
 
                   setIsPaletteVisible(!isPaletteVisible)
                 }}
@@ -2249,11 +2449,11 @@ const styles = StyleSheet.create({
   // Device Settings Panel
   deviceSettingsOverlay: {
     width: '94%',
-    maxHeight: '55%',
-    backgroundColor: 'rgba(20,20,20,0.95)',
-    borderRadius: 16,
-    marginHorizontal: '3%',
-    marginTop: 8,
+    height: SCREEN_HEIGHT * 0.44,
+    maxHeight: SCREEN_HEIGHT * 0.44,
+    backgroundColor: 'rgba(20,20,20,0.92)',
+    borderRadius: 20,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(0,229,255,0.15)',
     overflow: 'hidden',
@@ -2262,15 +2462,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   deviceSettingsContent: {
-    paddingVertical: 16,
     paddingHorizontal: 16,
+    paddingTop: 2,
     paddingBottom: 24,
   },
   deviceSettingsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    minHeight: 50,
+    paddingLeft: 16,
+    paddingRight: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   deviceSettingsTitle: {
     color: '#00E5FF',
@@ -2279,14 +2483,17 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
   },
+  panelCloseButton: {
+    margin: 0,
+  },
   dsSectionTitle: {
-    color: '#FF9800',
+    color: '#00E5FF',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    marginBottom: 8,
-    marginTop: 4,
+    marginBottom: 10,
+    marginTop: 14,
   },
   dsLabel: {
     color: 'rgba(255,255,255,0.5)',
@@ -2296,6 +2503,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 6,
     marginTop: 10,
+  },
+  dsOptionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+    rowGap: 8,
   },
   dsDivider: {
     height: 1,

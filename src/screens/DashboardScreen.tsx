@@ -180,7 +180,7 @@ const DashboardScreen = () => {
               {isConnected ? (
                 <>
                   <MaterialDesignIcons name="target" size={24} color="#FFF" />
-                  <Text style={styles.mainActionButtonText}>Observation 2</Text>
+                  <Text style={styles.mainActionButtonText}>Observation</Text>
                 </>
               ) : (
                 <Text style={styles.mainActionButtonText}>Reconnect</Text>

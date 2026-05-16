@@ -9,7 +9,6 @@ import {
   Text,
   StatusBar,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { Surface, IconButton } from 'react-native-paper';
@@ -18,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import MaterialDesignIcons from '@react-native-vector-icons/material-design-icons'
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
+import { useNotification } from '../provider/NotificationContext';
 
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 3;
@@ -72,6 +72,7 @@ const mapDeviceFileToViewerItem = (file: DeviceFile) => ({
 });
 
 const GalleryScreen = ({ navigation }: any) => {
+  const { showSnackbar } = useNotification();
   const [activeTab, setActiveTab] = useState<'local' | 'device'>('local');
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
   const [cloudFiles, setCloudFiles] = useState<DeviceFile[]>([]);
@@ -186,7 +187,7 @@ const GalleryScreen = ({ navigation }: any) => {
       navigation.navigate('RecentMedia', { uri: `file://${localPath}` });
     } catch (error) {
       console.log('❌ Error download device file:', error);
-      Alert.alert('Error', 'Gagal mengunduh file dari device');
+      showSnackbar('Gagal mengunduh file dari device');
     }
   };
 
@@ -271,7 +272,7 @@ const GalleryScreen = ({ navigation }: any) => {
     } catch (error: any) {
       if (error?.message !== 'User did not share') {
         console.log('Share selected error:', error);
-        Alert.alert('Error', 'Gagal membagikan media terpilih');
+        showSnackbar('Gagal membagikan media terpilih');
       }
     }
   };
@@ -289,41 +290,34 @@ const GalleryScreen = ({ navigation }: any) => {
   const handleDeleteSelected = () => {
     if (selectedCount === 0) return;
 
-    Alert.alert(
-      'Hapus Media',
-      `Hapus ${selectedCount} media terpilih?`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (activeTab === 'local') {
-                await Promise.all(
-                  selectedLocalUris.map((uri) => RNFS.unlink(getPathFromFileUri(uri)).catch(() => {})),
-                );
-                await loadMedia();
-              } else {
-                await Promise.all(
-                  cloudFiles
-                    .filter((file) => selectedDeviceNames.includes(file.name))
-                    .map(deleteRemoteFile),
-                );
-                await fetchCloudFiles();
-              }
+    showSnackbar(`Hapus ${selectedCount} media terpilih?`, {
+      actionLabel: 'HAPUS',
+      onAction: async () => {
+        try {
+          if (activeTab === 'local') {
+            await Promise.all(
+              selectedLocalUris.map((uri) => RNFS.unlink(getPathFromFileUri(uri)).catch(() => {})),
+            );
+            await loadMedia();
+          } else {
+            await Promise.all(
+              cloudFiles
+                .filter((file) => selectedDeviceNames.includes(file.name))
+                .map(deleteRemoteFile),
+            );
+            await fetchCloudFiles();
+          }
 
-              clearSelection();
-            } catch (error) {
-              console.log('Delete selected error:', error);
-              Alert.alert('Error', activeTab === 'device'
-                ? 'Gagal menghapus file dari remote device'
-                : 'Gagal menghapus media terpilih');
-            }
-          },
-        },
-      ],
-    );
+          clearSelection();
+          showSnackbar(`${selectedCount} media berhasil dihapus`);
+        } catch (error) {
+          console.log('Delete selected error:', error);
+          showSnackbar(activeTab === 'device'
+            ? 'Gagal menghapus file dari remote device'
+            : 'Gagal menghapus media terpilih');
+        }
+      },
+    });
   };
 
   const renderSelectionBadge = (selected: boolean) => (
